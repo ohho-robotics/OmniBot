@@ -1,0 +1,125 @@
+---
+# Isaac Sim ROS 2 Bridge Configuration
+#
+# Used by omni.isaac.ros2_bridge inside Isaac Sim (not by ros_gz_bridge).
+# Load this config when launching Isaac Sim in headless/script mode:
+#
+#   ./python.sh robot_ws/src/omnibot_bringup/scripts/isaac_sim_headless.py \
+#               --bridge-config <path>/isaac_ros_bridge.yaml
+#
+# Topic names are kept identical to ros_gz_bridge.yaml so all downstream
+# nodes (Nav2, smolvla_node, teleop_recorder_node) work unchanged.
+#
+# Direction field maps to Isaac Sim bridge concepts:
+#   subscriber  →  ROS topic that Isaac Sim reads  (ROS → Isaac)
+#   publisher   →  ROS topic that Isaac Sim writes (Isaac → ROS)
+
+# ── Base drive ───────────────────────────────────────────────────────────────
+- topic_name: /cmd_vel
+  message_type: geometry_msgs/msg/Twist
+  direction: subscriber          # ROS → Isaac: drive the articulation root
+
+- topic_name: /odom
+  message_type: nav_msgs/msg/Odometry
+  direction: publisher           # Isaac → ROS: from IsaacOdometry OmniGraph node
+
+# ── Kinematics & transforms ──────────────────────────────────────────────────
+- topic_name: /joint_states
+  message_type: sensor_msgs/msg/JointState
+  direction: publisher           # Isaac → ROS: all wheel + arm joints
+
+- topic_name: /tf
+  message_type: tf2_msgs/msg/TFMessage
+  direction: publisher           # Isaac → ROS: base_link, odom, camera frames
+
+# ── IMU ──────────────────────────────────────────────────────────────────────
+- topic_name: /imu/data
+  message_type: sensor_msgs/msg/Imu
+  direction: publisher           # Isaac RTX IMU sensor
+
+# ── RGB cameras ─────────────────────────────────────────────────────────────
+# Front-facing camera (matches /camera/image_raw used by vla_node)
+- topic_name: /camera/image_raw
+  message_type: sensor_msgs/msg/Image
+  direction: publisher
+
+- topic_name: /camera/camera_info
+  message_type: sensor_msgs/msg/CameraInfo
+  direction: publisher
+
+# Wrist camera (required by smolvla_node and teleop_recorder_node)
+- topic_name: /camera/wrist/image_raw
+  message_type: sensor_msgs/msg/Image
+  direction: publisher
+
+- topic_name: /camera/wrist/camera_info
+  message_type: sensor_msgs/msg/CameraInfo
+  direction: publisher
+
+# BEV base cameras (4 individual feeds for bev_stitcher_node)
+- topic_name: /camera/front/image_raw
+  message_type: sensor_msgs/msg/Image
+  direction: publisher
+
+- topic_name: /camera/rear/image_raw
+  message_type: sensor_msgs/msg/Image
+  direction: publisher
+
+- topic_name: /camera/left/image_raw
+  message_type: sensor_msgs/msg/Image
+  direction: publisher
+
+- topic_name: /camera/right/image_raw
+  message_type: sensor_msgs/msg/Image
+  direction: publisher
+
+# ── Depth (RGBD / Astra Pro equivalent) ─────────────────────────────────────
+- topic_name: /camera/depth/image_raw
+  message_type: sensor_msgs/msg/Image
+  direction: publisher           # Isaac RTX depth sensor
+
+- topic_name: /camera/depth/camera_info
+  message_type: sensor_msgs/msg/CameraInfo
+  direction: publisher
+
+- topic_name: /camera/color/image_raw
+  message_type: sensor_msgs/msg/Image
+  direction: publisher
+
+- topic_name: /camera/color/camera_info
+  message_type: sensor_msgs/msg/CameraInfo
+  direction: publisher
+
+- topic_name: /camera/depth/points
+  message_type: sensor_msgs/msg/PointCloud2
+  direction: publisher           # Isaac lidar / depth-to-pointcloud node
+
+# ── Arm commands (teleoperation / SmolVLA / RL → Isaac) ──────────────────────
+# arm_cmd_mux routes SmolVLA or RL arm commands to /arm/joint_commands/out.
+# arm_driver_node subscribes to /arm/joint_commands/out and writes to servos.
+# Isaac Sim receives /arm/joint_commands/out via this subscriber entry.
+- topic_name: /arm/joint_commands/out
+  message_type: sensor_msgs/msg/JointState
+  direction: subscriber          # ROS → Isaac: drives the arm articulation
+
+- topic_name: /arm/joint_states
+  message_type: sensor_msgs/msg/JointState
+  direction: publisher           # Isaac → ROS: actual arm joint angles
+
+# ── RL navigation topics ─────────────────────────────────────────────────────
+# /cmd_vel/rl is published by rl_nav_node and forwarded by cmd_vel_mux
+# to /cmd_vel/out when control_mode == "rl_nav".
+# Isaac Sim can receive it for sim-to-sim testing.
+- topic_name: /cmd_vel/rl
+  message_type: geometry_msgs/msg/Twist
+  direction: subscriber          # ROS → Isaac: RL nav velocity
+
+# /rl_nav/goal is published by mission_planner to rl_nav_node.
+- topic_name: /rl_nav/goal
+  message_type: geometry_msgs/msg/PoseStamped
+  direction: subscriber          # ROS → Isaac: goal for RL nav (monitoring)
+
+# ── Arm mode control ─────────────────────────────────────────────────────────
+- topic_name: /arm/cmd_mode
+  message_type: std_msgs/msg/String
+  direction: subscriber          # ROS → Isaac: "smolvla" | "rl_arm" (monitoring)

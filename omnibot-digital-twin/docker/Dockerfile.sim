@@ -1,0 +1,88 @@
+# OmniBot simulation image
+# Base: ROS 2 Jazzy desktop on Ubuntu 24.04
+# Adds: Gazebo Harmonic, ros_gz bridge, foxglove_bridge, rosbridge,
+#        Python ML deps (torch, transformers, lerobot), and workspace deps.
+#
+# Build context: repo root (so COPY paths work)
+#
+# Usage (standalone):
+#   docker build -f digital_twin/docker/Dockerfile.sim -t omnibot-sim .
+#   docker run --rm -it --network=host --gpus=all omnibot-sim bash
+#
+# Typical usage: via docker-compose.yml or VS Code DevContainer.
+
+FROM ros:jazzy-ros-base-noble
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    ROS_DISTRO=jazzy \
+    ROS_DOMAIN_ID=30 \
+    LANG=en_US.UTF-8
+
+# ── System packages ──────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # ROS 2 desktop (includes RViz, rqt, rviz plugins)
+    ros-jazzy-desktop \
+    # Gazebo Harmonic + ROS bridge
+    ros-jazzy-ros-gz \
+    ros-jazzy-ros-gz-bridge \
+    ros-jazzy-ros-gz-sim \
+    # Navigation stack
+    ros-jazzy-nav2-bringup \
+    ros-jazzy-nav2-costmap-2d \
+    ros-jazzy-slam-toolbox \
+    ros-jazzy-robot-localization \
+    # Visualization bridges
+    ros-jazzy-foxglove-bridge \
+    ros-jazzy-rosbridge-suite \
+    ros-jazzy-depthimage-to-laserscan \
+    # Build tools
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    python3-pip \
+    python3-vcstool \
+    git \
+    wget \
+    curl \
+    # OpenCV (for BEV stitcher)
+    python3-opencv \
+    libopencv-dev \
+    # Serial (for driver tests)
+    python3-serial \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Python ML dependencies ────────────────────────────────────────────────────
+# Install CPU-only torch for CI; GPU image will override via docker-compose
+RUN pip3 install --no-cache-dir \
+    "numpy<2.0" \
+    torch --index-url https://download.pytorch.org/whl/cpu \
+    torchvision --index-url https://download.pytorch.org/whl/cpu \
+    transformers \
+    accelerate \
+    datasets \
+    huggingface_hub \
+    pyarrow \
+    lerobot \
+    fastapi \
+    uvicorn \
+    httpx
+
+# ── rosdep init ───────────────────────────────────────────────────────────────
+RUN rosdep init 2>/dev/null || true && rosdep update
+
+# ── Non-root user ─────────────────────────────────────────────────────────────
+ARG USERNAME=user
+ARG USER_UID=1000
+ARG USER_GID=1000
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER $USERNAME
+WORKDIR /workspaces/OmniBot
+
+# ── Shell setup ───────────────────────────────────────────────────────────────
+RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc \
+    && echo "export ROS_DOMAIN_ID=30" >> ~/.bashrc \
+    && echo '[ -f /workspaces/OmniBot/robot_ws/install/setup.bash ] && source /workspaces/OmniBot/robot_ws/install/setup.bash' >> ~/.bashrc
+
+CMD ["/bin/bash"]

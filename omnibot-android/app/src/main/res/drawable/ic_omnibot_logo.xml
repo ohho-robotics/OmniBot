@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OmniBot: robot head icon with antenna and mecanum wheel dots -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+
+    <!-- Antenna stem -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M16,2 L16,7" />
+
+    <!-- Antenna tip glow dot -->
+    <path
+        android:fillColor="#64B5F6"
+        android:pathData="M13.5,2 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" />
+
+    <!-- Robot head (rounded rect) -->
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M5,7 Q5,5 7,5 L25,5 Q27,5 27,7 L27,21 Q27,23 25,23 L7,23 Q5,23 5,21 Z" />
+
+    <!-- Left eye (outer white) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10,14 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <!-- Left eye (inner blue pupil) -->
+    <path
+        android:fillColor="#0D47A1"
+        android:pathData="M11.5,14 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0" />
+
+    <!-- Right eye (outer white) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,14 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <!-- Right eye (inner blue pupil) -->
+    <path
+        android:fillColor="#0D47A1"
+        android:pathData="M17.5,14 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0" />
+
+    <!-- Mouth slot -->
+    <path
+        android:fillColor="#0D47A1"
+        android:pathData="M10,19 Q16,22 22,19 L22,20 Q16,23 10,20 Z" />
+
+    <!-- Robot body -->
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M8,23 L24,23 L24,29 L8,29 Z" />
+
+    <!-- Mecanum wheel dots (4 corners) -->
+    <path
+        android:fillColor="#64B5F6"
+        android:pathData="M5.5,25 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#64B5F6"
+        android:pathData="M22.5,25 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+
+</vector>

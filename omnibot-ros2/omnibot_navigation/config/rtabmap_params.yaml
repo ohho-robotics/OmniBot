@@ -1,0 +1,79 @@
+###############################################################################
+# RTAB-Map parameters for OmniBot 3-D mapping with Orbbec Astra Pro
+#
+# RTAB-Map performs RGB-D SLAM:
+#   - Loop-closure detection via visual bag-of-words on RGB frames
+#   - 3-D occupancy grid (OctoMap) for Nav2 VoxelLayer
+#   - Optimised graph-based pose estimation
+#
+# Astra Pro topic layout (ros2_astra_camera driver):
+#   /camera/color/image_raw   — RGB 1280×960
+#   /camera/color/camera_info
+#   /camera/depth/image_raw   — 16-bit depth (mm), 640×480
+#   /camera/depth/camera_info
+#   /camera/depth/points      — PointCloud2 (unregistered)
+#
+# Topic remappings (applied in rtabmap.launch.py):
+#   rgb/image          ← /camera/color/image_raw
+#   rgb/camera_info    ← /camera/color/camera_info
+#   depth/image        ← /camera/depth/image_raw
+#   depth/camera_info  ← /camera/depth/camera_info
+#   odom               ← /odom
+###############################################################################
+
+rtabmap:
+  ros__parameters:
+    # ── Frame / time ──────────────────────────────────────────────────────────
+    frame_id: base_link
+    odom_frame_id: odom
+    map_frame_id: map
+    subscribe_depth: true
+    subscribe_rgb: true
+    subscribe_scan: false          # no dedicated 2-D lidar; rely on depth only
+    use_sim_time: false
+
+    # ── Database ──────────────────────────────────────────────────────────────
+    database_path: "~/.ros/rtabmap.db"
+
+    # ── RTAB-Map core timings ─────────────────────────────────────────────────
+    # Process at most 1 frame per second; real detection happens asynchronously
+    Rtabmap/DetectionRate: "1.0"
+    Rtabmap/TimeThr: "0"           # no hard time limit per iteration
+    Rtabmap/MemoryThr: "0"         # no memory ceiling
+
+    # ── Odometry-based update thresholds ─────────────────────────────────────
+    RGBD/AngularUpdate: "0.01"     # rad  — min rotation before new node
+    RGBD/LinearUpdate: "0.01"      # m    — min translation before new node
+    RGBD/OptimizeFromGraphEnd: "false"
+    RGBD/MaxLocalMapSize: "0"      # 0 = unlimited local map
+
+    # ── Loop closure ─────────────────────────────────────────────────────────
+    Kp/MaxFeatures: "500"
+    Vis/MinInliers: "15"
+    RGBD/LoopClosureReextractFeatures: "false"
+
+    # ── 3-D occupancy grid (feeds Nav2 VoxelLayer + OctoMap) ─────────────────
+    Grid/3D: "true"
+    Grid/CellSize: "0.05"          # 5 cm voxel resolution
+    Grid/RangeMax: "8.0"           # Astra Pro max range
+    Grid/RangeMin: "0.6"           # Astra Pro min range (blind zone below)
+    Grid/NormalsSegmentation: "false"
+    Grid/MaxObstacleHeight: "2.0"
+    Grid/MinGroundHeight: "-0.1"
+    Grid/MaxGroundHeight: "0.05"   # ground plane threshold (m above base_link)
+    Grid/FlatObstacleDetected: "true"
+
+    # ── OctoMap output ────────────────────────────────────────────────────────
+    # Published on /rtabmap/octomap_binary and /rtabmap/octomap_full
+    Octomap/BinaryUpdate: "true"
+    GridGlobal/OccupancyThr: "0.5"
+
+    # ── Sync / approx time matching ───────────────────────────────────────────
+    approx_sync: true
+    approx_sync_max_interval: 0.05 # 50 ms tolerance for RGB-D pair sync
+
+    # ── Publishing ────────────────────────────────────────────────────────────
+    publish_tf: false              # EKF already broadcasts odom→base_link
+    gen_scan: false                # don't synthesise a fake 2-D scan
+    map_always_update: false
+    map_empty_ray_tracing: true

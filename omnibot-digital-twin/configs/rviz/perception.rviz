@@ -1,0 +1,124 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /RobotModel1
+        - /Image1
+        - /Image2
+        - /Image3
+        - /Image4
+        - /Image5
+        - /PointCloud21
+      Splitter Ratio: 0.5
+    Tree Height: 700
+  - Class: rviz_common/Selection
+    Name: Selection
+  - Class: rviz_common/Views
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+    Name: Views
+
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Name: Grid
+      Normal Cell Count: 0
+      Plane: XY
+      Plane Cell Count: 10
+      Reference Frame: <Fixed Frame>
+
+    - Class: rviz_default_plugins/RobotModel
+      Enabled: true
+      Name: RobotModel
+      Robot Description: robot_description
+      TF Prefix: ""
+      Visual Enabled: true
+
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: Front Camera
+      Topic:
+        Value: /camera/front/image_raw
+      Unreliable: false
+
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: Rear Camera
+      Topic:
+        Value: /camera/rear/image_raw
+      Unreliable: false
+
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: BEV Camera
+      Topic:
+        Value: /camera/base/bev/image_raw
+      Unreliable: false
+
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: Wrist Camera
+      Topic:
+        Value: /camera/wrist/image_raw
+      Unreliable: false
+
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: Depth Image
+      Topic:
+        Value: /camera/depth/image_raw
+      Unreliable: false
+
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: Depth PointCloud
+      Topic:
+        Value: /camera/depth/points
+      Size (m): 0.01
+      Color Transformer: AxisColor
+      Axis: Z
+
+    - Class: rviz_default_plugins/TF
+      Enabled: false
+      Name: TF
+      Show Arrows: false
+      Show Axes: true
+      Show Names: false
+
+  Enabled: true
+  Fixed Frame: base_link
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: base_link
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 2.5
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0.3
+      Name: Current View
+      Near Clip Distance: 0.01
+      Pitch: 0.5
+      Target Frame: base_link
+      Yaw: 1.0
+    Saved: ~
+
+Window Geometry:
+  Width:  1600
+  Height: 900

@@ -1,0 +1,433 @@
+<?xml version="1.0" ?>
+<!--
+  OmniBot Lab World — Gazebo Harmonic SDF 1.8
+
+  A small indoor lab environment for testing:
+    - Navigation / SLAM  : two rooms connected by a corridor, walls provide
+                           good lidar features for loop-closure
+    - Manipulation       : work table at standard desk height (0.74 m) with
+                           four YCB-style objects
+    - Perception         : varied lighting (overhead + side spot)
+
+  Primitive-geometry only — no external mesh dependencies required.
+  Objects are colour-coded to be visually distinct in camera feeds.
+
+  Robot spawn point: x=0, y=0 (corridor centre).
+
+  How to launch:
+    ros2 launch omnibot_bringup simulation.launch.py \
+      world:=<path>/digital_twin/worlds/omnibot_lab.sdf
+-->
+<sdf version="1.8">
+  <world name="omnibot_lab">
+
+    <!-- ── Core world systems ──────────────────────────────────────────── -->
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+
+    <!-- Sensor systems (camera + IMU + lidar — must be world-level) -->
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system"
+            name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-gpu-lidar-system"
+            name="gz::sim::systems::GpuLidar"/>
+
+    <!-- ── Lighting ────────────────────────────────────────────────────── -->
+    <!-- Overhead ambient fill -->
+    <light type="directional" name="overhead_sun">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 5 0 0 0</pose>
+      <diffuse>0.7 0.7 0.7 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation><range>100</range><constant>1.0</constant></attenuation>
+      <direction>0 0 -1</direction>
+    </light>
+
+    <!-- Side spot over work table — creates shadows for depth perception -->
+    <light type="spot" name="table_spot">
+      <cast_shadows>true</cast_shadows>
+      <pose>1.5 0 2.5 0 0.5 0</pose>
+      <diffuse>0.9 0.85 0.75 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>5</range>
+        <constant>0.3</constant>
+        <linear>0.1</linear>
+        <quadratic>0.05</quadratic>
+      </attenuation>
+      <direction>-0.6 0 -0.8</direction>
+      <spot>
+        <inner_angle>0.5</inner_angle>
+        <outer_angle>1.0</outer_angle>
+        <falloff>1.0</falloff>
+      </spot>
+    </light>
+
+    <!-- ── Ground plane ────────────────────────────────────────────────── -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+          <material>
+            <ambient>0.6 0.6 0.55 1</ambient>
+            <diffuse>0.6 0.6 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ================================================================
+         ROOM LAYOUT  (all walls are 0.15 m thick, 2.5 m tall)
+
+         +Y
+          │
+          │  ┌─────────────┐  ┌─────────────┐
+          │  │  Room A     │  │  Room B     │
+          │  │  (lab)      │  │  (storage)  │
+          │  │             │  │             │
+          │  └──────┐ ┌────┘  └─────────────┘
+          │         │corridor│
+          └──────────────────────────────── +X
+
+         Room A : 4 m × 5 m, centred at (-3, 0)
+         Room B : 3 m × 4 m, centred at ( 3, 0)
+         Corridor: 1.2 m wide, connecting rooms at x≈[-1,1], y≈[-0.6,0.6]
+         ================================================================ -->
+
+    <xacro:macro name="wall" params=""><!-- using plain SDF — no xacro in .sdf --></xacro:macro>
+
+    <!-- Helper: a static box wall -->
+    <!-- Room A outer walls -->
+    <model name="wall_A_north">
+      <static>true</static>
+      <pose>-3 2.575 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>4.15 0.15 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>4.15 0.15 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_A_south">
+      <static>true</static>
+      <pose>-3 -2.575 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>4.15 0.15 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>4.15 0.15 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_A_west">
+      <static>true</static>
+      <pose>-5.075 0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.15 5.3 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.15 5.3 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- East wall of Room A has a corridor opening at y=[-0.6, 0.6] -->
+    <model name="wall_A_east_north">
+      <static>true</static>
+      <pose>-1.075 1.575 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.15 2.0 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.15 2.0 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_A_east_south">
+      <static>true</static>
+      <pose>-1.075 -1.575 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.15 2.0 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.15 2.0 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Corridor walls -->
+    <model name="wall_corridor_north">
+      <static>true</static>
+      <pose>0 0.675 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>2.15 0.15 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>2.15 0.15 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_corridor_south">
+      <static>true</static>
+      <pose>0 -0.675 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>2.15 0.15 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>2.15 0.15 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Room B walls -->
+    <model name="wall_B_north">
+      <static>true</static>
+      <pose>3 2.075 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>3.15 0.15 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>3.15 0.15 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_B_south">
+      <static>true</static>
+      <pose>3 -2.075 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>3.15 0.15 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>3.15 0.15 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_B_east">
+      <static>true</static>
+      <pose>4.575 0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.15 4.3 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.15 4.3 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- West wall of Room B has the corridor opening -->
+    <model name="wall_B_west_north">
+      <static>true</static>
+      <pose>1.075 1.375 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.15 1.5 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.15 1.5 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_B_west_south">
+      <static>true</static>
+      <pose>1.075 -1.375 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.15 1.5 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.15 1.5 2.5</size></box></geometry>
+          <material><ambient>0.85 0.85 0.82 1</ambient><diffuse>0.85 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ================================================================
+         WORK TABLE — standard desk 1.2 m × 0.6 m × 0.74 m (h)
+         Centred in Room A, pushed to +X wall to leave nav space.
+         ================================================================ -->
+    <model name="work_table">
+      <static>true</static>
+      <pose>-2.0 0 0 0 0 0</pose>
+      <!-- Table top -->
+      <link name="table_top">
+        <pose>0 0 0.715 0 0 0</pose>
+        <collision name="col">
+          <geometry><box><size>1.2 0.6 0.05</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><box><size>1.2 0.6 0.05</size></box></geometry>
+          <material>
+            <ambient>0.55 0.40 0.25 1</ambient>
+            <diffuse>0.55 0.40 0.25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <!-- 4 legs -->
+      <link name="leg_fl">
+        <pose>0.55 0.27 0.35 0 0 0</pose>
+        <collision name="col"><geometry><box><size>0.05 0.05 0.70</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.05 0.05 0.70</size></box></geometry>
+          <material><ambient>0.3 0.2 0.15 1</ambient><diffuse>0.3 0.2 0.15 1</diffuse></material>
+        </visual>
+      </link>
+      <link name="leg_fr">
+        <pose>0.55 -0.27 0.35 0 0 0</pose>
+        <collision name="col"><geometry><box><size>0.05 0.05 0.70</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.05 0.05 0.70</size></box></geometry>
+          <material><ambient>0.3 0.2 0.15 1</ambient><diffuse>0.3 0.2 0.15 1</diffuse></material>
+        </visual>
+      </link>
+      <link name="leg_rl">
+        <pose>-0.55 0.27 0.35 0 0 0</pose>
+        <collision name="col"><geometry><box><size>0.05 0.05 0.70</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.05 0.05 0.70</size></box></geometry>
+          <material><ambient>0.3 0.2 0.15 1</ambient><diffuse>0.3 0.2 0.15 1</diffuse></material>
+        </visual>
+      </link>
+      <link name="leg_rr">
+        <pose>-0.55 -0.27 0.35 0 0 0</pose>
+        <collision name="col"><geometry><box><size>0.05 0.05 0.70</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.05 0.05 0.70</size></box></geometry>
+          <material><ambient>0.3 0.2 0.15 1</ambient><diffuse>0.3 0.2 0.15 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ================================================================
+         YCB-STYLE OBJECTS on the table surface (z = 0.74 m table top)
+         All are primitive-geometry stand-ins for real YCB objects.
+
+         - mustard_bottle  : yellow cylinder  (~YCB 006)
+         - tomato_soup_can : red cylinder     (~YCB 005)
+         - cracker_box     : orange box       (~YCB 003)
+         - foam_brick      : blue box         (~YCB 061)
+         ================================================================ -->
+    <model name="mustard_bottle">
+      <pose>-1.75 0.10 0.832 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><cylinder><radius>0.033</radius><length>0.184</length></cylinder></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.033</radius><length>0.184</length></cylinder></geometry>
+          <material><ambient>0.9 0.8 0.1 1</ambient><diffuse>0.9 0.8 0.1 1</diffuse></material>
+        </visual>
+        <inertial>
+          <mass value="0.603"/>
+          <inertia ixx="1e-3" ixy="0" ixz="0" iyy="1e-3" iyz="0" izz="2e-4"/>
+        </inertial>
+      </link>
+    </model>
+
+    <model name="tomato_soup_can">
+      <pose>-1.75 -0.10 0.799 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><cylinder><radius>0.033</radius><length>0.102</length></cylinder></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.033</radius><length>0.102</length></cylinder></geometry>
+          <material><ambient>0.85 0.15 0.15 1</ambient><diffuse>0.85 0.15 0.15 1</diffuse></material>
+        </visual>
+        <inertial>
+          <mass value="0.349"/>
+          <inertia ixx="3e-4" ixy="0" ixz="0" iyy="3e-4" iyz="0" izz="1.9e-4"/>
+        </inertial>
+      </link>
+    </model>
+
+    <model name="cracker_box">
+      <pose>-2.15 0.05 0.802 0 0 0.3</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><box><size>0.158 0.207 0.073</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><box><size>0.158 0.207 0.073</size></box></geometry>
+          <material><ambient>0.9 0.5 0.1 1</ambient><diffuse>0.9 0.5 0.1 1</diffuse></material>
+        </visual>
+        <inertial>
+          <mass value="0.411"/>
+          <inertia ixx="2e-3" ixy="0" ixz="0" iyy="1e-3" iyz="0" izz="2.5e-3"/>
+        </inertial>
+      </link>
+    </model>
+
+    <model name="foam_brick">
+      <pose>-1.95 0.20 0.778 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><box><size>0.075 0.050 0.050</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><box><size>0.075 0.050 0.050</size></box></geometry>
+          <material><ambient>0.15 0.35 0.85 1</ambient><diffuse>0.15 0.35 0.85 1</diffuse></material>
+        </visual>
+        <inertial>
+          <mass value="0.028"/>
+          <inertia ixx="2e-5" ixy="0" ixz="0" iyy="2e-5" iyz="0" izz="3e-5"/>
+        </inertial>
+      </link>
+    </model>
+
+    <!-- ================================================================
+         BOOKSHELF in Room A (south wall)
+         1.0 m wide, 0.35 m deep, 1.8 m tall — static obstacle for Nav2
+         ================================================================ -->
+    <model name="bookshelf">
+      <static>true</static>
+      <pose>-3.5 -2.2 0 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><box><size>1.0 0.35 1.8</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <pose>0 0 0.9 0 0 0</pose>
+          <geometry><box><size>1.0 0.35 1.8</size></box></geometry>
+          <material><ambient>0.4 0.28 0.18 1</ambient><diffuse>0.4 0.28 0.18 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ================================================================
+         CARDBOARD BOX in Room B — acts as a pickup target in storage area
+         ================================================================ -->
+    <model name="cardboard_box">
+      <pose>3.0 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><box><size>0.40 0.30 0.50</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><box><size>0.40 0.30 0.50</size></box></geometry>
+          <material><ambient>0.75 0.65 0.45 1</ambient><diffuse>0.75 0.65 0.45 1</diffuse></material>
+        </visual>
+        <inertial>
+          <mass value="1.0"/>
+          <inertia ixx="4e-2" ixy="0" ixz="0" iyy="4e-2" iyz="0" izz="3e-2"/>
+        </inertial>
+      </link>
+    </model>
+
+  </world>
+</sdf>

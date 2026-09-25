@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#050510">
+
+    <!-- Top-down point cloud canvas -->
+    <com.varunvaidhiya.robotcontrol.ui.views.PointCloudView
+        android:id="@+id/point_cloud_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Top label -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="3D Point Cloud  (top-down)"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:background="#AA000000"
+        android:padding="6dp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="12dp" />
+
+    <!-- Depth colour legend (bottom-right) -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#CC000000"
+        android:padding="8dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DEPTH"
+            android:textColor="#64B5F6"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <!-- Gradient bar -->
+        <View
+            android:id="@+id/depth_legend_bar"
+            android:layout_width="16dp"
+            android:layout_height="80dp"
+            android:background="@drawable/bg_depth_gradient" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="near"
+                android:textColor="#80FFFFFF"
+                android:textSize="8sp" />
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="far"
+            android:textColor="#80FFFFFF"
+            android:textSize="8sp" />
+
+    </LinearLayout>
+
+    <!-- Stats panel (bottom-left) -->
+    <LinearLayout
+        android:id="@+id/panel_cloud_stats"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#CC000000"
+        android:padding="10dp"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="POINT CLOUD"
+            android:textColor="#64B5F6"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/text_point_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Points: --"
+            android:textColor="#FFFFFF"
+            android:fontFamily="monospace"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/text_cloud_range"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Range: -- m"
+            android:textColor="#FFFFFF"
+            android:fontFamily="monospace"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/text_cloud_fps"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FPS:   --"
+            android:textColor="#FFFFFF"
+            android:fontFamily="monospace"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+    <!-- No-data placeholder -->
+    <LinearLayout
+        android:id="@+id/layout_no_data"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_gravity="center">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No depth data"
+            android:textColor="#60FFFFFF"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Topic: /camera/depth/points"
+            android:textColor="#40FFFFFF"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:layout_marginTop="6dp" />
+
+    </LinearLayout>
+
+</FrameLayout>

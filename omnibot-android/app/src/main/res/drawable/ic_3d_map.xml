@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 3D point cloud / depth map icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Floor plane (perspective quad) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="?attr/colorControlNormal"
+        android:strokeWidth="1.5"
+        android:pathData="M2,18 L12,22 L22,18 L12,14 Z" />
+    <!-- Back wall -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="?attr/colorControlNormal"
+        android:strokeWidth="1.5"
+        android:pathData="M2,18 L2,10 L12,6 L22,10 L22,18" />
+    <!-- Vertical line -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="?attr/colorControlNormal"
+        android:strokeWidth="1.5"
+        android:pathData="M12,14 L12,6" />
+    <!-- Point cloud dots -->
+    <path
+        android:fillColor="?attr/colorPrimary"
+        android:pathData="M7,15 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path
+        android:fillColor="?attr/colorPrimary"
+        android:pathData="M14,13 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path
+        android:fillColor="?attr/colorPrimary"
+        android:pathData="M11,17 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path
+        android:fillColor="#64B5F6"
+        android:pathData="M9,11 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path
+        android:fillColor="#64B5F6"
+        android:pathData="M16,16 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+</vector>

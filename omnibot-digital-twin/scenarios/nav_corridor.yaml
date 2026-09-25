@@ -1,0 +1,71 @@
+# nav_corridor.yaml — Navigation benchmark scenarios
+#
+# Tests Nav2 + SLAM contributor work without needing the arm / VLA stack.
+# All scenarios use digital_twin/worlds/omnibot_lab.sdf.
+#
+# Usage:
+#   1. Launch simulation:
+#      ros2 launch omnibot_bringup simulation.launch.py \
+#        world:=$(pwd)/digital_twin/worlds/omnibot_lab.sdf
+#   2. Start SLAM:
+#      ros2 launch omnibot_navigation slam_toolbox.launch.py \
+#        params_file:=$(pwd)/digital_twin/configs/nav2_sim_params.yaml
+#   3. Start Nav2:
+#      ros2 launch omnibot_navigation autonomous_robot.launch.py \
+#        params_file:=$(pwd)/digital_twin/configs/nav2_sim_params.yaml
+#   4. Send goal via Nav2 panel in RViz (navigation.rviz) or:
+#      ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+#        "{pose: {header: {frame_id: map}, pose: {position: {x: <X>, y: <Y>}}}}"
+
+world: digital_twin/worlds/omnibot_lab.sdf
+
+scenarios:
+
+  - name: room_a_to_room_b
+    description: >
+      Navigate from Room A (near table) through the corridor into Room B.
+      Tests: doorway clearance, obstacle inflation around table + shelf.
+    start_pose:  {x: -3.0, y:  0.5, yaw: 0.0}
+    goal_pose:   {x:  3.0, y:  0.5, yaw: 0.0}
+    expected_path_length_m: 8.5   # approximate corridor traversal
+    timeout_s: 60
+
+  - name: room_b_to_room_a
+    description: >
+      Return trip Room B → Room A. Tests recovery if reverse path blocked.
+    start_pose:  {x:  3.0, y:  0.5, yaw: 3.1416}
+    goal_pose:   {x: -3.0, y:  0.5, yaw: 3.1416}
+    expected_path_length_m: 8.5
+    timeout_s: 60
+
+  - name: room_a_loop
+    description: >
+      Navigate a loop inside Room A: start → north wall → west wall → south
+      (near shelf) → back to start.  Tests tight-space navigation.
+    waypoints:
+      - {x: -3.0, y:  2.0, yaw:  1.5708}
+      - {x: -4.5, y:  2.0, yaw:  3.1416}
+      - {x: -4.5, y: -1.5, yaw: -1.5708}
+      - {x: -3.0, y:  0.5, yaw:  0.0}
+    timeout_s: 120
+
+  - name: corridor_narrow_pass
+    description: >
+      Tests that the robot can traverse the 1.2 m corridor (robot width ≈
+      0.25 m + inflation ≈ 0.35 m → clearance ≈ 0.25 m each side).
+      Reduces controller speed to expose tracking errors.
+    start_pose: {x: -0.8, y:  0.0, yaw: 0.0}
+    goal_pose:  {x:  0.8, y:  0.0, yaw: 0.0}
+    max_vel_override: 0.1   # slow speed for precision test
+    timeout_s: 30
+
+  - name: slam_room_a_mapping
+    description: >
+      Drive the robot manually around Room A to build a map from scratch.
+      Use RViz (navigation.rviz) to watch the map grow.
+      Teleop command:
+        ros2 run teleop_twist_keyboard teleop_twist_keyboard
+    notes: >
+      This scenario has no automated goal — it is a manual exploration task
+      for SLAM contributors verifying loop-closure quality.
+    start_pose: {x: -3.0, y: 0.0, yaw: 0.0}

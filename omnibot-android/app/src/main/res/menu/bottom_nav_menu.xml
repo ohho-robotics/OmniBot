@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/navigation_home"
+        android:icon="@drawable/ic_home"
+        android:title="@string/title_home" />
+    <item
+        android:id="@+id/navigation_dashboard"
+        android:icon="@drawable/ic_dashboard"
+        android:title="@string/title_dashboard" />
+    <item
+        android:id="@+id/navigation_map"
+        android:icon="@drawable/ic_map"
+        android:title="@string/title_map" />
+    <item
+        android:id="@+id/navigation_ai"
+        android:icon="@drawable/ic_ai_chat"
+        android:title="@string/title_ai" />
+    <item
+        android:id="@+id/navigation_controls"
+        android:icon="@drawable/ic_gamepad"
+        android:title="@string/title_controls" />
+    <item
+        android:id="@+id/navigation_ota"
+        android:icon="@drawable/ic_ota"
+        android:title="@string/title_ota" />
+</menu>

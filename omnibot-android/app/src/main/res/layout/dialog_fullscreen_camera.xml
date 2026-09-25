@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <com.varunvaidhiya.robotcontrol.ui.views.MjpegView
+        android:id="@+id/mjpeg_fullscreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Close button -->
+    <ImageButton
+        android:id="@+id/btn_close_fullscreen"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="12dp"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:background="#80000000"
+        android:tint="#FFFFFF"
+        android:contentDescription="Close fullscreen" />
+
+    <!-- REC badge overlay -->
+    <TextView
+        android:id="@+id/text_fs_rec"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="⏺ REC"
+        android:textColor="#FF4444"
+        android:textSize="13sp"
+        android:background="#CC000000"
+        android:padding="6dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="12dp"
+        android:visibility="gone" />
+
+</FrameLayout>

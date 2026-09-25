@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ── HUD Design Tokens ─────────────────────────────────────────── -->
+    <color name="hud_bg">#010D18</color>
+    <color name="hud_accent">#00E5FF</color>
+    <color name="hud_accent2">#80F0FF</color>
+    <color name="hud_text">#B8EEF8</color>
+    <!-- 38% opacity cyan  (ARGB #61 00 E5 FF) -->
+    <color name="hud_muted">#6100E5FF</color>
+    <!-- 28% opacity cyan  (ARGB #47 00 E5 FF) -->
+    <color name="hud_inactive">#4700E5FF</color>
+    <!-- 22% opacity cyan  (ARGB #38 00 E5 FF) -->
+    <color name="hud_card_border">#3800E5FF</color>
+    <!--  4% opacity cyan  (ARGB #0A 00 E5 FF) -->
+    <color name="hud_card_bg">#0A00E5FF</color>
+    <!--  8% opacity cyan for bar track -->
+    <color name="hud_bar_track">#1400E5FF</color>
+
+    <!-- Status -->
+    <color name="hud_ok">#00FF7F</color>
+    <color name="hud_warn">#FFD700</color>
+    <color name="hud_err">#FF4444</color>
+
+    <!-- Chart -->
+    <color name="chart_vx">#00E5FF</color>
+    <color name="chart_vy">#00FF7F</color>
+    <color name="chart_vw">#FFD700</color>
+
+    <!-- Compatibility aliases ────────────────────────────────────────── -->
+    <color name="primary_color">#00E5FF</color>
+    <color name="primary_dark">#010D18</color>
+    <color name="accent_color">#80F0FF</color>
+    <color name="background_light">#010D18</color>
+    <color name="card_background">#0A00E5FF</color>
+    <color name="status_connected">#00FF7F</color>
+    <color name="status_connecting">#FFD700</color>
+    <color name="status_error">#FF4444</color>
+    <color name="text_primary">#B8EEF8</color>
+    <color name="text_secondary">#6100E5FF</color>
+
+    <!-- Material defaults (library compatibility) -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

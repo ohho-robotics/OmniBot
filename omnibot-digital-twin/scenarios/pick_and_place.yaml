@@ -1,0 +1,116 @@
+# pick_and_place.yaml — VLA / manipulation scenario definitions
+#
+# Each scenario defines:
+#   - world       : SDF world to load
+#   - robot_pose  : starting pose of the robot (map frame)
+#   - objects     : list of target objects with their table-top poses
+#   - task_prompt : SmolVLA / OpenVLA natural-language instruction
+#   - success_criterion : human-readable description of success
+#
+# Usage:
+#   1. Launch simulation with the lab world:
+#      ros2 launch omnibot_bringup simulation.launch.py \
+#        world:=$(pwd)/digital_twin/worlds/omnibot_lab.sdf
+#   2. Drive robot to robot_pose (or set 2D Pose Estimate in RViz).
+#   3. Publish the task_prompt:
+#      ros2 topic pub --once /smolvla/task std_msgs/msg/String \
+#        "data: '<task_prompt>'"
+#      ros2 topic pub --once /smolvla/enable std_msgs/msg/Bool "data: true"
+
+world: digital_twin/worlds/omnibot_lab.sdf
+
+scenarios:
+
+  - name: pick_mustard_bottle
+    description: >
+      Robot approaches the work table from the south, picks up the yellow
+      mustard bottle with the arm, and lifts it 0.15 m above the table.
+    robot_pose:
+      x: -2.0
+      y: -1.0
+      yaw: 1.5708   # facing +Y (table side)
+    objects:
+      - model_name: mustard_bottle
+        table_pose: {x: -1.75, y: 0.10, z: 0.832}
+    task_prompt: "pick up the yellow mustard bottle"
+    success_criterion: >
+      mustard_bottle z-position > 0.90 m for at least 0.5 s
+    vla_node: smolvla   # smolvla | openvla
+
+  - name: pick_soup_can
+    description: >
+      Robot approaches the work table, picks up the red tomato soup can.
+    robot_pose:
+      x: -2.0
+      y: -1.0
+      yaw: 1.5708
+    objects:
+      - model_name: tomato_soup_can
+        table_pose: {x: -1.75, y: -0.10, z: 0.799}
+    task_prompt: "pick up the red soup can"
+    success_criterion: >
+      tomato_soup_can z-position > 0.85 m for at least 0.5 s
+    vla_node: smolvla
+
+  - name: pick_cracker_box
+    description: >
+      Robot picks up the orange cracker box from the table.
+    robot_pose:
+      x: -1.8
+      y: -0.8
+      yaw: 1.8
+    objects:
+      - model_name: cracker_box
+        table_pose: {x: -2.15, y: 0.05, z: 0.802}
+    task_prompt: "pick up the orange cracker box"
+    success_criterion: >
+      cracker_box z-position > 0.88 m for at least 0.5 s
+    vla_node: smolvla
+
+  - name: pick_foam_brick
+    description: >
+      Robot picks up the blue foam brick — smallest object, tests precision.
+    robot_pose:
+      x: -2.0
+      y: -1.0
+      yaw: 1.5708
+    objects:
+      - model_name: foam_brick
+        table_pose: {x: -1.95, y: 0.20, z: 0.778}
+    task_prompt: "pick up the blue foam brick"
+    success_criterion: >
+      foam_brick z-position > 0.83 m for at least 0.5 s
+    vla_node: smolvla
+
+  - name: navigate_then_pick
+    description: >
+      Full mobile manipulation: robot navigates from Room B corridor entry
+      to the table in Room A, then picks the mustard bottle.
+      Tests the hybrid Nav2 → VLA pipeline.
+    robot_pose:
+      x: 0.0
+      y: 0.0
+      yaw: 3.1416   # start in corridor, facing Room A
+    objects:
+      - model_name: mustard_bottle
+        table_pose: {x: -1.75, y: 0.10, z: 0.832}
+    task_prompt: "navigate to the table and pick up the yellow mustard bottle"
+    mission_command: "navigate:lab_table,vla:pick up the yellow mustard bottle"
+    success_criterion: >
+      robot reaches x≈-2.0, y≈-1.0 (±0.3 m) then mustard_bottle z > 0.90 m
+    vla_node: smolvla
+
+# Named locations used by mission_planner (mirrors named_locations.yaml)
+named_locations:
+  lab_table:
+    x: -2.0
+    y: -1.0
+    yaw: 1.5708
+  corridor_centre:
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+  room_b_entry:
+    x: 2.5
+    y: 0.0
+    yaw: 3.1416

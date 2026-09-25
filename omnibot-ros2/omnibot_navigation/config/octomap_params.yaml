@@ -1,0 +1,48 @@
+###############################################################################
+# OctoMap Server parameters for OmniBot
+#
+# octomap_server subscribes to /rtabmap/cloud_map (PointCloud2) and builds
+# a 3-D OctoMap which is then sliced into a 2-D projected occupancy grid
+# and a MarkerArray for RViz visualisation.
+#
+# Run via:  ros2 launch omnibot_navigation rtabmap.launch.py
+###############################################################################
+
+octomap_server:
+  ros__parameters:
+    # ── Map frame ─────────────────────────────────────────────────────────────
+    frame_id: map
+    base_frame_id: base_link
+
+    # ── Resolution ────────────────────────────────────────────────────────────
+    resolution: 0.05               # 5 cm voxel (matches RTAB-Map grid cell)
+
+    # ── Height filter for ground-projection 2-D map ───────────────────────────
+    # Voxels between occupancy_min_z and occupancy_max_z are projected
+    # to produce /projected_map (OccupancyGrid for Nav2).
+    occupancy_min_z: 0.05          # ignore ground returns
+    occupancy_max_z: 2.0           # ignore ceiling / overhangs above robot
+
+    # ── Point cloud input ─────────────────────────────────────────────────────
+    # Subscribes to this topic to insert points into the OctoMap.
+    # RTAB-Map publishes the full 3-D cloud on /rtabmap/cloud_map.
+    cloud_in: /rtabmap/cloud_map
+
+    # ── Sensor model ─────────────────────────────────────────────────────────
+    sensor_model_max_range: 8.0    # Astra Pro max range (m)
+    sensor_model_hit: 0.7
+    sensor_model_miss: 0.4
+    sensor_model_min: 0.12
+    sensor_model_max: 0.97
+
+    # ── Publish rates ─────────────────────────────────────────────────────────
+    filter_ground: true            # strip the ground plane before publishing
+    filter_speckles: true
+    compress_map: true
+
+    # ── Output topics (all published by octomap_server) ───────────────────────
+    # /octomap_binary        — octomap_msgs/msg/Octomap (compressed binary)
+    # /octomap_full          — octomap_msgs/msg/Octomap (full probability)
+    # /occupied_cells_vis_array — visualization_msgs/msg/MarkerArray
+    # /projected_map         — nav_msgs/msg/OccupancyGrid (2-D slice)
+    use_sim_time: false

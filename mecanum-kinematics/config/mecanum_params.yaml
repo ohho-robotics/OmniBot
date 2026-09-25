@@ -1,0 +1,13 @@
+# mecanum_drive_ros2 default parameters
+# Tune these values to match your robot's physical measurements.
+
+mecanum_controller:
+  ros__parameters:
+    # Wheel geometry
+    wheel_radius: 0.04            # metres — measure from wheel centre to roller contact
+    wheel_separation_width: 0.215  # metres — left-to-right wheel centre distance
+    wheel_separation_length: 0.165 # metres — front-to-rear wheel centre distance
+
+    # Serial (used only if the node drives a serial-connected controller)
+    serial_port: /dev/ttyACM0
+    baud_rate: 115200

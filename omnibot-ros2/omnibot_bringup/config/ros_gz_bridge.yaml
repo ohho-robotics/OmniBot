@@ -1,0 +1,127 @@
+---
+# ros_gz_bridge configuration for Mecanum Wheel Robot simulation
+# Direction: ROS → GZ uses subscriber_queue_size; GZ → ROS uses publisher_queue_size
+
+# ── Simulation clock — must be bridged first so all ROS nodes see sim time ──────
+# Without this, TF timestamps from Gazebo (sim time) won't match ROS wall clock,
+# causing TF lookups to fail and the robot to appear frozen in RViz.
+- ros_topic_name: "/clock"
+  gz_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+
+# ── Joint states — wheels (Gazebo JointStatePublisher → robot_state_publisher) ──
+# gz.msgs.Model is the Gazebo Harmonic type published by gz-sim-joint-state-publisher-system.
+- ros_topic_name: "/joint_states"
+  gz_topic_name: "/joint_states"
+  ros_type_name: "sensor_msgs/msg/JointState"
+  gz_type_name: "gz.msgs.Model"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/cmd_vel"
+  gz_topic_name: "/cmd_vel"
+  ros_type_name: "geometry_msgs/msg/Twist"
+  gz_type_name: "gz.msgs.Twist"
+  direction: ROS_TO_GZ
+
+- ros_topic_name: "/odom"
+  gz_topic_name: "/odom"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/tf"
+  gz_topic_name: "/tf"
+  ros_type_name: "tf2_msgs/msg/TFMessage"
+  gz_type_name: "gz.msgs.Pose_V"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/imu/data"
+  gz_topic_name: "/imu/data"
+  ros_type_name: "sensor_msgs/msg/Imu"
+  gz_type_name: "gz.msgs.IMU"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/camera/image_raw"
+  gz_topic_name: "/camera/image_raw"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/camera/camera_info"
+  gz_topic_name: "/camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+# ── Orbbec Astra Pro depth camera (Gazebo RGBD sensor) ────────────────────────
+# Topic names on the ROS side are chosen to match ros2_astra_camera driver
+# output exactly, so rtabmap.launch.py remappings work identically in
+# simulation and on the physical robot.
+
+# Depth image (Gazebo publishes as /camera/depth/image; bridge renames to
+# /camera/depth/image_raw to match the Astra Pro driver convention)
+- ros_topic_name: "/camera/depth/image_raw"
+  gz_topic_name: "/camera/depth/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/camera/depth/camera_info"
+  gz_topic_name: "/camera/depth/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+# RGB image from RGBD sensor (Gazebo publishes colour as /camera/depth/image_rgb8)
+- ros_topic_name: "/camera/color/image_raw"
+  gz_topic_name: "/camera/depth/image_rgb8"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/camera/color/camera_info"
+  gz_topic_name: "/camera/depth/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+# NOTE: OmniBot has no 2D lidar.  The /scan (LaserScan) topic used by
+# slam_toolbox and Nav2 is generated at runtime by the depthimage_to_laserscan
+# node (see simulation.launch.py) from the Orbbec Astra Pro depth image.
+# No bridge entry is needed here for /scan.
+
+# ── 4 base cameras for BEV stitcher ──────────────────────────────────────────
+# bev_stitcher_node subscribes to /camera/{front,rear,left,right}/image_raw.
+# These sensors are defined in omnibot.urdf.xacro and must be bridged explicitly.
+- ros_topic_name: "/camera/front/image_raw"
+  gz_topic_name: "/camera/front/image_raw"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/camera/rear/image_raw"
+  gz_topic_name: "/camera/rear/image_raw"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/camera/left/image_raw"
+  gz_topic_name: "/camera/left/image_raw"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/camera/right/image_raw"
+  gz_topic_name: "/camera/right/image_raw"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+# Per-frame PointCloud2 for Nav2 VoxelLayer / ObstacleLayer
+- ros_topic_name: "/camera/depth/points"
+  gz_topic_name: "/camera/depth/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  direction: GZ_TO_ROS

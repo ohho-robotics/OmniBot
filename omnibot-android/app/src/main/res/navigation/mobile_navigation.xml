@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/navigation_home">
+
+    <fragment
+        android:id="@+id/navigation_home"
+        android:name="com.varunvaidhiya.robotcontrol.ui.home.HomeFragment"
+        android:label="@string/hud_label_home"
+        tools:layout="@layout/fragment_home" />
+
+    <fragment
+        android:id="@+id/navigation_dashboard"
+        android:name="com.varunvaidhiya.robotcontrol.ui.dashboard.DashboardFragment"
+        android:label="@string/hud_label_dashboard"
+        tools:layout="@layout/fragment_dashboard" />
+
+    <fragment
+        android:id="@+id/navigation_map"
+        android:name="com.varunvaidhiya.robotcontrol.ui.mapping.MapFragment"
+        android:label="@string/hud_label_map"
+        tools:layout="@layout/fragment_map" />
+
+    <fragment
+        android:id="@+id/navigation_ai"
+        android:name="com.varunvaidhiya.robotcontrol.ui.ai.AIFragment"
+        android:label="@string/hud_label_ai"
+        tools:layout="@layout/fragment_ai" />
+
+    <fragment
+        android:id="@+id/navigation_controls"
+        android:name="com.varunvaidhiya.robotcontrol.ui.controls.ControlsFragment"
+        android:label="@string/hud_label_controls"
+        tools:layout="@layout/fragment_controls" />
+
+    <fragment
+        android:id="@+id/navigation_settings"
+        android:name="com.varunvaidhiya.robotcontrol.ui.settings.SettingsFragment"
+        android:label="@string/hud_label_settings"
+        tools:layout="@layout/fragment_settings" />
+
+    <fragment
+        android:id="@+id/navigation_observability"
+        android:name="com.varunvaidhiya.robotcontrol.ui.observability.ObservabilityFragment"
+        android:label="OBSERVABILITY"
+        tools:layout="@layout/fragment_observability" />
+
+    <fragment
+        android:id="@+id/navigation_ota"
+        android:name="com.varunvaidhiya.robotcontrol.ui.ota.OTAFragment"
+        android:label="@string/hud_label_ota"
+        tools:layout="@layout/fragment_ota" />
+
+</navigation>

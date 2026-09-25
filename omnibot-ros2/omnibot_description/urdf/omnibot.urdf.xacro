@@ -1,0 +1,992 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mecanum_bot">
+
+    <xacro:property name="PI" value="3.1415926535897931"/>
+
+    <!-- ================================================================
+         Chassis — two black aluminium plates separated by 8 standoffs.
+         Bottom plate = base_link.
+         Total height (ground → top plate surface) ≈ 240 mm.
+         ================================================================ -->
+    <xacro:property name="chassis_length"    value="0.265"/>  <!-- 265 mm front-to-rear -->
+    <xacro:property name="chassis_width"     value="0.250"/>  <!-- 250 mm left-to-right -->
+    <xacro:property name="plate_thickness"   value="0.006"/>  <!-- 6 mm aluminium plate -->
+    <xacro:property name="standoff_height"   value="0.160"/>  <!-- 160 mm between plate faces -->
+    <xacro:property name="ground_clearance"  value="0.070"/>  <!-- ground → bottom of bottom plate -->
+
+    <!-- Bottom plate (base_link) centre above base_footprint -->
+    <xacro:property name="base_link_z_offset" value="${ground_clearance + plate_thickness / 2.0}"/>
+    <!-- Top plate centre above base_link centre -->
+    <xacro:property name="top_plate_dz"       value="${plate_thickness + standoff_height}"/>
+    <!-- Top surface of top plate above base_link centre (used for mounting) -->
+    <xacro:property name="top_surface_dz"     value="${top_plate_dz + plate_thickness / 2.0}"/>
+
+    <!-- ================================================================
+         Wheels
+         ================================================================ -->
+    <xacro:property name="wheel_radius"       value="0.04"/>
+    <xacro:property name="wheel_width"        value="0.037"/>
+    <xacro:property name="wheel_separation_x" value="0.165"/>
+    <xacro:property name="wheel_separation_y" value="0.215"/>
+    <!-- Negative: wheels hang below bottom plate -->
+    <xacro:property name="wheel_z_offset"     value="${wheel_radius - base_link_z_offset}"/>
+    <xacro:property name="wheel_x_offset"     value="${wheel_separation_x / 2.0}"/>
+    <xacro:property name="wheel_y_offset"     value="${wheel_separation_y / 2.0}"/>
+
+    <!-- ================================================================
+         Masses
+         ================================================================ -->
+    <xacro:property name="base_mass"       value="1.5"/>
+    <xacro:property name="top_plate_mass"  value="1.0"/>
+    <xacro:property name="wheel_mass"      value="0.2"/>
+    <xacro:property name="camera_mass"     value="0.05"/>
+    <xacro:property name="astra_mass"      value="0.300"/>
+
+    <!-- ================================================================
+         OV9732 camera body size (camera + case)
+         ================================================================ -->
+    <xacro:property name="camera_size_x"   value="0.030"/>  <!-- depth into face -->
+    <xacro:property name="camera_size_y"   value="0.030"/>  <!-- width -->
+    <xacro:property name="camera_size_z"   value="0.025"/>  <!-- height -->
+
+    <!-- ================================================================
+         base_footprint — ground-level reference frame
+         ================================================================ -->
+    <link name="base_footprint"/>
+
+    <!-- ================================================================
+         base_link — BOTTOM PLATE (black aluminium)
+         Thin flat plate at ground_clearance height above ground.
+         Electronics, Pi, battery, and Yahboom board are mounted
+         between the two plates (not modelled individually).
+         ================================================================ -->
+    <link name="base_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <box size="${chassis_length} ${chassis_width} ${plate_thickness}"/>
+            </geometry>
+            <material name="chassis_black">
+                <color rgba="0.08 0.08 0.08 1"/>
+            </material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <box size="${chassis_length} ${chassis_width} ${plate_thickness}"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="${base_mass}"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia
+                ixx="${base_mass / 12.0 * (chassis_width*chassis_width   + plate_thickness*plate_thickness)}"
+                ixy="0" ixz="0"
+                iyy="${base_mass / 12.0 * (chassis_length*chassis_length + plate_thickness*plate_thickness)}"
+                iyz="0"
+                izz="${base_mass / 12.0 * (chassis_length*chassis_length + chassis_width*chassis_width)}"/>
+        </inertial>
+    </link>
+
+    <gazebo reference="base_link">
+        <material>Gazebo/DarkGrey</material>
+    </gazebo>
+
+    <joint name="base_footprint_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 ${base_link_z_offset}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ================================================================
+         Standoffs — 8 aluminium hex standoffs connecting the two plates.
+         Two pairs at each corner region of the chassis.
+         ================================================================ -->
+    <xacro:macro name="standoff" params="prefix x_pos y_pos">
+        <link name="${prefix}_standoff_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <cylinder radius="0.007" length="${standoff_height}"/>
+                </geometry>
+                <material name="standoff_silver">
+                    <color rgba="0.65 0.65 0.65 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <cylinder radius="0.007" length="${standoff_height}"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.04"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+            </inertial>
+        </link>
+        <joint name="${prefix}_standoff_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="${prefix}_standoff_link"/>
+            <!-- standoff spans from top face of bottom plate to bottom face of top plate -->
+            <origin xyz="${x_pos} ${y_pos} ${plate_thickness / 2.0 + standoff_height / 2.0}" rpy="0 0 0"/>
+        </joint>
+    </xacro:macro>
+
+    <!-- 8 standoffs: two pairs near each corner -->
+    <xacro:standoff prefix="so_fl_a" x_pos=" 0.095" y_pos=" 0.085"/>
+    <xacro:standoff prefix="so_fl_b" x_pos=" 0.065" y_pos=" 0.095"/>
+    <xacro:standoff prefix="so_fr_a" x_pos=" 0.095" y_pos="-0.085"/>
+    <xacro:standoff prefix="so_fr_b" x_pos=" 0.065" y_pos="-0.095"/>
+    <xacro:standoff prefix="so_rl_a" x_pos="-0.095" y_pos=" 0.085"/>
+    <xacro:standoff prefix="so_rl_b" x_pos="-0.065" y_pos=" 0.095"/>
+    <xacro:standoff prefix="so_rr_a" x_pos="-0.095" y_pos="-0.085"/>
+    <xacro:standoff prefix="so_rr_b" x_pos="-0.065" y_pos="-0.095"/>
+
+    <!-- ================================================================
+         top_plate_link — UPPER PLATE (black aluminium)
+         The SO-ARM 101 and depth camera mount here.
+         ================================================================ -->
+    <link name="top_plate_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <box size="${chassis_length} ${chassis_width} ${plate_thickness}"/>
+            </geometry>
+            <material name="chassis_black"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <box size="${chassis_length} ${chassis_width} ${plate_thickness}"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="${top_plate_mass}"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia
+                ixx="${top_plate_mass / 12.0 * (chassis_width*chassis_width   + plate_thickness*plate_thickness)}"
+                ixy="0" ixz="0"
+                iyy="${top_plate_mass / 12.0 * (chassis_length*chassis_length + plate_thickness*plate_thickness)}"
+                iyz="0"
+                izz="${top_plate_mass / 12.0 * (chassis_length*chassis_length + chassis_width*chassis_width)}"/>
+        </inertial>
+    </link>
+
+    <gazebo reference="top_plate_link">
+        <material>Gazebo/DarkGrey</material>
+    </gazebo>
+
+    <joint name="top_plate_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="top_plate_link"/>
+        <!-- top plate centre is one plate_thickness + standoff_height above bottom plate centre -->
+        <origin xyz="0 0 ${top_plate_dz}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ================================================================
+         OV9732 wide-angle cameras — one near each edge of the bottom plate,
+         sitting flat on its top surface. Each camera faces outward horizontally.
+         FOV: 100° (1.745 rad), 1280×720, USB UVC.
+         ================================================================ -->
+    <xacro:macro name="base_camera" params="prefix x_pos y_pos yaw_angle">
+        <link name="${prefix}_camera_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${camera_size_x} ${camera_size_y} ${camera_size_z}"/>
+                </geometry>
+                <material name="dark_grey">
+                    <color rgba="0.15 0.15 0.15 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${camera_size_x} ${camera_size_y} ${camera_size_z}"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="${camera_mass}"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia
+                    ixx="${camera_mass / 12.0 * (camera_size_y*camera_size_y + camera_size_z*camera_size_z)}"
+                    ixy="0" ixz="0"
+                    iyy="${camera_mass / 12.0 * (camera_size_x*camera_size_x + camera_size_z*camera_size_z)}"
+                    iyz="0"
+                    izz="${camera_mass / 12.0 * (camera_size_x*camera_size_x + camera_size_y*camera_size_y)}"/>
+            </inertial>
+        </link>
+
+        <!-- Cameras sit on top surface of base_link, near each edge, facing outward. -->
+        <joint name="${prefix}_camera_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="${prefix}_camera_link"/>
+            <origin xyz="${x_pos} ${y_pos} ${plate_thickness / 2.0 + camera_size_z / 2.0}"
+                    rpy="0 0 ${yaw_angle}"/>
+        </joint>
+
+        <gazebo reference="${prefix}_camera_link">
+            <sensor name="${prefix}_camera_sensor" type="camera">
+                <always_on>1</always_on>
+                <update_rate>30</update_rate>
+                <visualize>false</visualize>
+                <topic>/camera/${prefix}/image_raw</topic>
+                <gz_frame_id>${prefix}_camera_link</gz_frame_id>
+                <camera>
+                    <horizontal_fov>1.745</horizontal_fov>
+                    <image>
+                        <width>640</width>
+                        <height>480</height>
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.05</near>
+                        <far>10</far>
+                    </clip>
+                </camera>
+            </sensor>
+        </gazebo>
+    </xacro:macro>
+
+    <!-- Cameras on top of the base plate, near each edge, facing outward -->
+    <xacro:base_camera prefix="front"
+        x_pos="${chassis_length / 2.0 - camera_size_x / 2.0}"
+        y_pos="0"
+        yaw_angle="0"/>
+
+    <xacro:base_camera prefix="rear"
+        x_pos="${-(chassis_length / 2.0 - camera_size_x / 2.0)}"
+        y_pos="0"
+        yaw_angle="${PI}"/>
+
+    <xacro:base_camera prefix="left"
+        x_pos="0"
+        y_pos="${chassis_width / 2.0 - camera_size_x / 2.0}"
+        yaw_angle="${PI/2}"/>
+
+    <xacro:base_camera prefix="right"
+        x_pos="0"
+        y_pos="${-(chassis_width / 2.0 - camera_size_x / 2.0)}"
+        yaw_angle="${-PI/2}"/>
+
+    <!-- ================================================================
+         Orbbec Astra Pro Depth Camera
+         Mounted on the TOP PLATE, facing REARWARD (−X direction).
+         The robot drives backward for Nav2, so the depth camera covers
+         the direction of travel. Tilted 12° downward.
+         Astra Pro: 165 mm × 30 mm × 40 mm, 300 g, USB 2.0
+         Depth range: 0.6–8.0 m, FOV 60°H × 49.5°V
+         ================================================================ -->
+    <link name="depth_camera_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <!-- 165 mm wide, 30 mm deep, 40 mm tall -->
+                <box size="0.030 0.165 0.040"/>
+            </geometry>
+            <material name="astra_black">
+                <color rgba="0.08 0.08 0.08 1"/>
+            </material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.030 0.165 0.040"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="${astra_mass}"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia
+                ixx="${astra_mass / 12.0 * (0.165*0.165 + 0.040*0.040)}"
+                ixy="0" ixz="0"
+                iyy="${astra_mass / 12.0 * (0.030*0.030 + 0.040*0.040)}"
+                iyz="0"
+                izz="${astra_mass / 12.0 * (0.030*0.030 + 0.165*0.165)}"/>
+        </inertial>
+    </link>
+
+    <!-- Rear-centre of top plate, 20 mm above surface, 12° down-tilt, facing rearward (yaw=PI) -->
+    <joint name="depth_camera_joint" type="fixed">
+        <parent link="top_plate_link"/>
+        <child link="depth_camera_link"/>
+        <origin xyz="${-(chassis_length / 2.0 - 0.030)} 0 ${plate_thickness / 2.0 + 0.025}"
+                rpy="0 -0.2094 ${PI}"/>
+    </joint>
+
+    <!-- Optical frame: Z forward, X right, Y down (ROS convention) -->
+    <link name="depth_camera_optical_frame"/>
+    <joint name="depth_camera_optical_joint" type="fixed">
+        <parent link="depth_camera_link"/>
+        <child link="depth_camera_optical_frame"/>
+        <origin xyz="0 0 0" rpy="${-PI/2} 0 ${-PI/2}"/>
+    </joint>
+
+    <gazebo reference="depth_camera_link">
+        <sensor name="astra_pro_sensor" type="rgbd_camera">
+            <always_on>1</always_on>
+            <update_rate>30</update_rate>
+            <visualize>false</visualize>
+            <topic>/camera/depth</topic>
+            <gz_frame_id>depth_camera_optical_frame</gz_frame_id>
+            <camera>
+                <horizontal_fov>1.0472</horizontal_fov>
+                <image>
+                    <width>640</width>
+                    <height>480</height>
+                    <format>R_FLOAT32</format>
+                </image>
+                <clip>
+                    <near>0.6</near>
+                    <far>8.0</far>
+                </clip>
+                <noise>
+                    <type>gaussian</type>
+                    <mean>0.0</mean>
+                    <stddev>0.005</stddev>
+                </noise>
+            </camera>
+        </sensor>
+    </gazebo>
+
+    <!-- ================================================================
+         Backwards-compat camera_link for simulation.launch.py
+         Moved to top_plate centre, facing forward.
+         ================================================================ -->
+    <link name="camera_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.040 0.025 0.025"/>
+            </geometry>
+            <material name="grey">
+                <color rgba="0.5 0.5 0.5 1"/>
+            </material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="0.040 0.025 0.025"/></geometry>
+        </collision>
+        <inertial>
+            <mass value="${camera_mass}"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+        </inertial>
+    </link>
+
+    <joint name="camera_joint" type="fixed">
+        <parent link="top_plate_link"/>
+        <child link="camera_link"/>
+        <origin xyz="0 0 ${plate_thickness / 2.0 + 0.015}" rpy="0 0 0"/>
+    </joint>
+
+    <gazebo reference="camera_link">
+        <sensor name="camera_sensor" type="camera">
+            <always_on>1</always_on>
+            <update_rate>30</update_rate>
+            <visualize>false</visualize>
+            <topic>/camera/image_raw</topic>
+            <gz_frame_id>camera_link</gz_frame_id>
+            <camera>
+                <horizontal_fov>1.047</horizontal_fov>
+                <image>
+                    <width>640</width>
+                    <height>480</height>
+                    <format>R8G8B8</format>
+                </image>
+                <clip>
+                    <near>0.05</near>
+                    <far>50</far>
+                </clip>
+            </camera>
+        </sensor>
+    </gazebo>
+
+    <!-- ================================================================
+         IMU — Yahboom board MPU9250 (mounted between plates, at centre)
+         ================================================================ -->
+    <link name="imu_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="0.03 0.03 0.015"/></geometry>
+            <material name="red"><color rgba="0.8 0.1 0.1 1"/></material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="0.03 0.03 0.015"/></geometry>
+        </collision>
+        <inertial>
+            <mass value="0.01"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+        </inertial>
+    </link>
+
+    <joint name="imu_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="imu_link"/>
+        <!-- Centred on bottom plate, slightly above surface -->
+        <origin xyz="0 0 ${plate_thickness / 2.0 + 0.008}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ================================================================
+         Mecanum wheels — 4× with barrel roller visuals.
+
+         Wheel axis = Y in the link frame (joint axis xyz="0 1 0").
+         The wheel disk lies in the XZ plane.
+
+         8 barrel rollers are placed at φ = 0, π/4, … 7π/4 around the rim.
+         Roller centre distance from hub axis: rR = wheel_radius − roller_r
+         Roller orientation formula (derived analytically):
+           rpy = ( cs × (−π/4),  π/2 + φ,  0 )
+         where cs = +1 gives "\" chirality, cs = −1 gives "/" chirality.
+
+         Diagonal pairs share chirality: FL+RR = cs +1, FR+RL = cs −1.
+
+         Collision: plain cylinder (physics engine approximation).
+         ================================================================ -->
+
+    <!-- rR  = roller centre radius  = wheel_radius − 0.006        -->
+    <!-- rRn = rR × sin(π/4) ≈ rR × 0.7071  (diagonal positions)  -->
+
+    <xacro:macro name="wheel" params="prefix x_reflect y_reflect cs">
+        <link name="${prefix}_wheel_link">
+
+            <!-- Hub — solid dark cylinder, slightly narrower than roller rim -->
+            <visual>
+                <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius * 0.80}" length="${wheel_width}"/>
+                </geometry>
+                <material name="wheel_black">
+                    <color rgba="0.10 0.10 0.10 1"/>
+                </material>
+            </visual>
+
+            <!-- 8 barrel rollers arranged around the circumference at 45° intervals -->
+            <!-- φ = 0   (top,    +Z) -->
+            <visual>
+                <origin xyz="0 0 ${wheel_radius - 0.006}"
+                        rpy="${cs * (-PI/4)} ${PI/2} 0"/>
+                <geometry><cylinder radius="0.006" length="0.030"/></geometry>
+                <material name="roller_grey"><color rgba="0.28 0.28 0.28 1"/></material>
+            </visual>
+            <!-- φ = π/4 -->
+            <visual>
+                <origin xyz="${(wheel_radius - 0.006) * 0.7071} 0 ${(wheel_radius - 0.006) * 0.7071}"
+                        rpy="${cs * (-PI/4)} ${3 * PI/4} 0"/>
+                <geometry><cylinder radius="0.006" length="0.030"/></geometry>
+                <material name="roller_grey"/>
+            </visual>
+            <!-- φ = π/2  (front, +X) -->
+            <visual>
+                <origin xyz="${wheel_radius - 0.006} 0 0"
+                        rpy="${cs * (-PI/4)} ${PI} 0"/>
+                <geometry><cylinder radius="0.006" length="0.030"/></geometry>
+                <material name="roller_grey"/>
+            </visual>
+            <!-- φ = 3π/4 -->
+            <visual>
+                <origin xyz="${(wheel_radius - 0.006) * 0.7071} 0 ${-(wheel_radius - 0.006) * 0.7071}"
+                        rpy="${cs * (-PI/4)} ${5 * PI/4} 0"/>
+                <geometry><cylinder radius="0.006" length="0.030"/></geometry>
+                <material name="roller_grey"/>
+            </visual>
+            <!-- φ = π   (bottom, −Z) -->
+            <visual>
+                <origin xyz="0 0 ${-(wheel_radius - 0.006)}"
+                        rpy="${cs * (-PI/4)} ${3 * PI/2} 0"/>
+                <geometry><cylinder radius="0.006" length="0.030"/></geometry>
+                <material name="roller_grey"/>
+            </visual>
+            <!-- φ = 5π/4 -->
+            <visual>
+                <origin xyz="${-(wheel_radius - 0.006) * 0.7071} 0 ${-(wheel_radius - 0.006) * 0.7071}"
+                        rpy="${cs * (-PI/4)} ${7 * PI/4} 0"/>
+                <geometry><cylinder radius="0.006" length="0.030"/></geometry>
+                <material name="roller_grey"/>
+            </visual>
+            <!-- φ = 3π/2  (rear, −X) -->
+            <visual>
+                <origin xyz="${-(wheel_radius - 0.006)} 0 0"
+                        rpy="${cs * (-PI/4)} ${2 * PI} 0"/>
+                <geometry><cylinder radius="0.006" length="0.030"/></geometry>
+                <material name="roller_grey"/>
+            </visual>
+            <!-- φ = 7π/4 -->
+            <visual>
+                <origin xyz="${-(wheel_radius - 0.006) * 0.7071} 0 ${(wheel_radius - 0.006) * 0.7071}"
+                        rpy="${cs * (-PI/4)} ${9 * PI/4} 0"/>
+                <geometry><cylinder radius="0.006" length="0.030"/></geometry>
+                <material name="roller_grey"/>
+            </visual>
+
+            <!-- Collision: simple cylinder for physics (covers full wheel radius) -->
+            <collision>
+                <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+                </geometry>
+            </collision>
+
+            <inertial>
+                <mass value="${wheel_mass}"/>
+                <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+                <inertia
+                    ixx="${wheel_mass/12.0*(3*wheel_radius*wheel_radius + wheel_width*wheel_width)}"
+                    ixy="0" ixz="0"
+                    iyy="${wheel_mass/2.0*(wheel_radius*wheel_radius)}"
+                    iyz="0"
+                    izz="${wheel_mass/12.0*(3*wheel_radius*wheel_radius + wheel_width*wheel_width)}"/>
+            </inertial>
+        </link>
+
+        <gazebo reference="${prefix}_wheel_link">
+            <material>Gazebo/DarkGrey</material>
+            <mu1>0.8</mu1>
+            <mu2>0.8</mu2>
+        </gazebo>
+
+        <!-- No yaw in joint — wheels always face straight forward/rear.
+             The diagonal roller force is handled by the MecanumDrive plugin. -->
+        <joint name="${prefix}_wheel_joint" type="continuous">
+            <parent link="base_link"/>
+            <child link="${prefix}_wheel_link"/>
+            <origin xyz="${x_reflect * wheel_x_offset} ${y_reflect * wheel_y_offset} ${wheel_z_offset}"
+                    rpy="0 0 0"/>
+            <axis xyz="0 1 0"/>
+            <limit effort="100" velocity="100"/>
+        </joint>
+
+        <transmission name="${prefix}_wheel_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}_wheel_joint">
+                <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="${prefix}_wheel_motor">
+                <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+    </xacro:macro>
+
+    <!-- FL+RR share cs=+1 ("\"), FR+RL share cs=−1 ("/") -->
+    <xacro:wheel prefix="front_left"  x_reflect=" 1" y_reflect=" 1" cs=" 1"/>
+    <xacro:wheel prefix="front_right" x_reflect=" 1" y_reflect="-1" cs="-1"/>
+    <xacro:wheel prefix="rear_left"   x_reflect="-1" y_reflect=" 1" cs="-1"/>
+    <xacro:wheel prefix="rear_right"  x_reflect="-1" y_reflect="-1" cs=" 1"/>
+
+    <!-- ================================================================
+         SO-ARM 101 — 6-DOF follower arm (TheRobotStudio/SO-ARM100)
+         Joint origins/axes/limits: EXACT from so101_new_calib.urdf.
+         Visuals: box + cylinder primitives (render in any viewer).
+         STL meshes kept in meshes/so101/ for ROS 2 use after colcon build.
+         ================================================================ -->
+
+    <material name="arm_white"><color rgba="0.95 0.95 0.95 1.0"/></material>
+    <material name="arm_servo"><color rgba="0.12 0.12 0.12 1.0"/></material>
+
+    <!-- Fixed joint: top plate → arm base -->
+    <joint name="arm_base_joint" type="fixed">
+        <parent link="top_plate_link"/>
+        <child link="arm_base_link"/>
+        <origin xyz="0.055 0 ${plate_thickness / 2.0}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ARM BASE — pedestal body + bottom servo -->
+    <link name="arm_base_link">
+        <visual>
+            <!-- Main body: ~75×65×55 mm box, centred at z=0.035 -->
+            <origin xyz="0 0 0.035" rpy="0 0 0"/>
+            <geometry><box size="0.075 0.065 0.055"/></geometry>
+            <material name="arm_white"/>
+        </visual>
+        <visual>
+            <!-- STS3215 base servo body -->
+            <origin xyz="0.026 0 0.044" rpy="0 0 0"/>
+            <geometry><box size="0.040 0.025 0.040"/></geometry>
+            <material name="arm_servo"/>
+        </visual>
+        <visual>
+            <!-- Waveshare mounting plate on top -->
+            <origin xyz="-0.031 0 0.068" rpy="0 0 0"/>
+            <geometry><box size="0.080 0.060 0.006"/></geometry>
+            <material name="arm_white"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0.035" rpy="0 0 0"/>
+            <geometry><box size="0.075 0.065 0.070"/></geometry>
+        </collision>
+        <inertial>
+            <origin xyz="0.0137179 -5.19711e-05 0.0334843" rpy="0 0 0"/>
+            <mass value="0.147"/>
+            <inertia ixx="0.000114686" ixy="-4.59787e-07" ixz="4.97151e-06"
+                     iyy="0.000136117" iyz="9.75275e-08" izz="0.000130364"/>
+        </inertial>
+    </link>
+
+    <!-- SHOULDER — pan servo + motor holder + rotation pitch bracket -->
+    <link name="arm_shoulder_link">
+        <visual>
+            <!-- STS3215 shoulder servo, lying on its side -->
+            <origin xyz="-0.031 0 -0.025" rpy="${PI/2} 0 0"/>
+            <geometry><cylinder radius="0.020" length="0.050"/></geometry>
+            <material name="arm_servo"/>
+        </visual>
+        <visual>
+            <!-- Motor holder + rotation pitch bracket -->
+            <origin xyz="0.012 0 0.046" rpy="0 0 0"/>
+            <geometry><box size="0.040 0.045 0.038"/></geometry>
+            <material name="arm_white"/>
+        </visual>
+        <collision>
+            <origin xyz="-0.031 0 -0.025" rpy="${PI/2} 0 0"/>
+            <geometry><cylinder radius="0.020" length="0.050"/></geometry>
+        </collision>
+        <inertial>
+            <origin xyz="-0.0307604 -1.66727e-05 -0.0252713" rpy="0 0 0"/>
+            <mass value="0.100006"/>
+            <inertia ixx="8.3759e-05" ixy="7.55525e-08" ixz="-1.16342e-06"
+                     iyy="8.10403e-05" iyz="1.54663e-07" izz="2.39783e-05"/>
+        </inertial>
+    </link>
+
+    <!-- shoulder_pan — exact origin from so101_new_calib.urdf -->
+    <joint name="arm_shoulder_pan" type="revolute">
+        <origin xyz="0.0388353 -8.97657e-09 0.0624" rpy="3.14159 4.18253e-17 -3.14159"/>
+        <parent link="arm_base_link"/>
+        <child link="arm_shoulder_link"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="10" velocity="10" lower="-1.91986" upper="1.91986"/>
+    </joint>
+    <transmission name="arm_shoulder_pan_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="arm_shoulder_pan">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="arm_motor1">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+
+    <!-- UPPER ARM — beam + elbow servo -->
+    <link name="arm_upper_arm_link">
+        <visual>
+            <!-- Upper arm beam -->
+            <origin xyz="-0.065 0.012 0.018" rpy="0 0 0"/>
+            <geometry><box size="0.125 0.035 0.030"/></geometry>
+            <material name="arm_white"/>
+        </visual>
+        <visual>
+            <!-- STS3215 elbow servo -->
+            <origin xyz="-0.113 -0.016 0.019" rpy="${PI/2} 0 0"/>
+            <geometry><cylinder radius="0.018" length="0.040"/></geometry>
+            <material name="arm_servo"/>
+        </visual>
+        <collision>
+            <origin xyz="-0.065 0.012 0.018" rpy="0 0 0"/>
+            <geometry><box size="0.125 0.035 0.030"/></geometry>
+        </collision>
+        <inertial>
+            <origin xyz="-0.0898471 -0.00838224 0.0184089" rpy="0 0 0"/>
+            <mass value="0.103"/>
+            <inertia ixx="4.08002e-05" ixy="-1.97819e-05" ixz="-4.03016e-08"
+                     iyy="0.000147318" iyz="8.97326e-09" izz="0.000142487"/>
+        </inertial>
+    </link>
+
+    <!-- shoulder_lift — exact origin from so101_new_calib.urdf -->
+    <joint name="arm_shoulder_lift" type="revolute">
+        <origin xyz="-0.0303992 -0.0182778 -0.0542" rpy="-1.5708 -1.5708 0"/>
+        <parent link="arm_shoulder_link"/>
+        <child link="arm_upper_arm_link"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="10" velocity="10" lower="-1.74533" upper="1.74533"/>
+    </joint>
+    <transmission name="arm_shoulder_lift_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="arm_shoulder_lift">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="arm_motor2">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+
+    <!-- LOWER ARM — forearm beam + wrist servo -->
+    <link name="arm_lower_arm_link">
+        <visual>
+            <!-- Forearm beam -->
+            <origin xyz="-0.065 -0.032 0.018" rpy="0 0 0"/>
+            <geometry><box size="0.125 0.030 0.028"/></geometry>
+            <material name="arm_white"/>
+        </visual>
+        <visual>
+            <!-- STS3215 wrist servo -->
+            <origin xyz="-0.122 0.005 0.019" rpy="${PI/2} 0 0"/>
+            <geometry><cylinder radius="0.018" length="0.040"/></geometry>
+            <material name="arm_servo"/>
+        </visual>
+        <collision>
+            <origin xyz="-0.065 -0.032 0.018" rpy="0 0 0"/>
+            <geometry><box size="0.125 0.030 0.028"/></geometry>
+        </collision>
+        <inertial>
+            <origin xyz="-0.0980701 0.00324376 0.0182831" rpy="0 0 0"/>
+            <mass value="0.104"/>
+            <inertia ixx="2.87438e-05" ixy="7.41152e-06" ixz="1.26409e-06"
+                     iyy="0.000159844" iyz="-4.90188e-08" izz="0.00014529"/>
+        </inertial>
+    </link>
+
+    <!-- elbow_flex — exact origin from so101_new_calib.urdf -->
+    <joint name="arm_elbow_flex" type="revolute">
+        <origin xyz="-0.11257 -0.028 1.73763e-16" rpy="-3.63608e-16 8.74301e-16 1.5708"/>
+        <parent link="arm_upper_arm_link"/>
+        <child link="arm_lower_arm_link"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="10" velocity="10" lower="-1.69" upper="1.69"/>
+    </joint>
+    <transmission name="arm_elbow_flex_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="arm_elbow_flex">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="arm_motor3">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+
+    <!-- WRIST — roll/pitch bracket + servo (no horn) -->
+    <link name="arm_wrist_link">
+        <visual>
+            <!-- Wrist roll-pitch body -->
+            <origin xyz="0 -0.028 0.018" rpy="0 0 0"/>
+            <geometry><box size="0.038 0.035 0.040"/></geometry>
+            <material name="arm_white"/>
+        </visual>
+        <visual>
+            <!-- STS3215 no-horn servo -->
+            <origin xyz="0 -0.042 0.031" rpy="${PI/2} 0 0"/>
+            <geometry><cylinder radius="0.018" length="0.040"/></geometry>
+            <material name="arm_servo"/>
+        </visual>
+        <collision>
+            <origin xyz="0 -0.028 0.018" rpy="0 0 0"/>
+            <geometry><box size="0.038 0.035 0.040"/></geometry>
+        </collision>
+        <inertial>
+            <origin xyz="-0.000103312 -0.0386143 0.0281156" rpy="0 0 0"/>
+            <mass value="0.079"/>
+            <inertia ixx="3.68263e-05" ixy="1.7893e-08" ixz="-5.28128e-08"
+                     iyy="2.5391e-05" iyz="3.6412e-06" izz="2.1e-05"/>
+        </inertial>
+    </link>
+
+    <!-- wrist_flex — exact origin from so101_new_calib.urdf -->
+    <joint name="arm_wrist_flex" type="revolute">
+        <origin xyz="-0.1349 0.0052 3.62355e-17" rpy="4.02456e-15 8.67362e-16 -1.5708"/>
+        <parent link="arm_lower_arm_link"/>
+        <child link="arm_wrist_link"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="10" velocity="10" lower="-1.65806" upper="1.65806"/>
+    </joint>
+    <transmission name="arm_wrist_flex_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="arm_wrist_flex">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="arm_motor4">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+
+    <!-- GRIPPER — roll follower body + roll servo -->
+    <link name="arm_gripper_link">
+        <visual>
+            <!-- Wrist roll follower body -->
+            <origin xyz="0 0 -0.015" rpy="0 0 0"/>
+            <geometry><box size="0.060 0.040 0.055"/></geometry>
+            <material name="arm_white"/>
+        </visual>
+        <visual>
+            <!-- STS3215 roll servo -->
+            <origin xyz="0.008 0 -0.023" rpy="0 ${PI/2} 0"/>
+            <geometry><cylinder radius="0.018" length="0.040"/></geometry>
+            <material name="arm_servo"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 -0.015" rpy="0 0 0"/>
+            <geometry><box size="0.060 0.040 0.055"/></geometry>
+        </collision>
+        <inertial>
+            <origin xyz="0.000213627 0.000245138 -0.025187" rpy="0 0 0"/>
+            <mass value="0.087"/>
+            <inertia ixx="2.75087e-05" ixy="-3.35241e-07" ixz="-5.7352e-06"
+                     iyy="4.33657e-05" iyz="-5.17847e-08" izz="3.45059e-05"/>
+        </inertial>
+    </link>
+
+    <!-- wrist_roll — exact origin from so101_new_calib.urdf -->
+    <joint name="arm_wrist_roll" type="revolute">
+        <origin xyz="5.55112e-17 -0.0611 0.0181" rpy="1.5708 0.0486795 3.14159"/>
+        <parent link="arm_wrist_link"/>
+        <child link="arm_gripper_link"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="10" velocity="10" lower="-2.74385" upper="2.84121"/>
+    </joint>
+    <transmission name="arm_wrist_roll_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="arm_wrist_roll">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="arm_motor5">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+
+    <!-- GRIPPER FRAME — tool-frame reference (fixed, massless) -->
+    <link name="arm_gripper_frame_link">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="1e-9"/>
+            <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+        </inertial>
+    </link>
+    <joint name="arm_gripper_frame_joint" type="fixed">
+        <origin xyz="-0.0079 -0.000218121 -0.0981274" rpy="0 3.14159 0"/>
+        <parent link="arm_gripper_link"/>
+        <child link="arm_gripper_frame_link"/>
+    </joint>
+
+    <!-- MOVING JAW -->
+    <link name="arm_moving_jaw_link">
+        <visual>
+            <origin xyz="0 -0.030 0.019" rpy="0 0 0"/>
+            <geometry><box size="0.018 0.010 0.050"/></geometry>
+            <material name="arm_white"/>
+        </visual>
+        <collision>
+            <origin xyz="0 -0.030 0.019" rpy="0 0 0"/>
+            <geometry><box size="0.018 0.010 0.050"/></geometry>
+        </collision>
+        <inertial>
+            <origin xyz="-0.00157495 -0.0300244 0.0192755" rpy="0 0 0"/>
+            <mass value="0.012"/>
+            <inertia ixx="6.61427e-06" ixy="-3.19807e-07" ixz="-5.90717e-09"
+                     iyy="1.89032e-06" iyz="-1.09945e-07" izz="5.28738e-06"/>
+        </inertial>
+    </link>
+
+    <!-- gripper — exact origin from so101_new_calib.urdf -->
+    <joint name="arm_gripper" type="revolute">
+        <origin xyz="0.0202 0.0188 -0.0234" rpy="1.5708 -5.24284e-08 -1.41553e-15"/>
+        <parent link="arm_gripper_link"/>
+        <child link="arm_moving_jaw_link"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="10" velocity="10" lower="-0.174533" upper="1.74533"/>
+    </joint>
+    <transmission name="arm_gripper_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="arm_gripper">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="arm_motor6">
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+
+    <!-- ================================================================
+         Wrist camera — OV9732 on the gripper body, facing along gripper
+         ================================================================ -->
+    <link name="wrist_camera_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="0.025 0.020 0.020"/></geometry>
+            <material name="dark_grey"><color rgba="0.15 0.15 0.15 1"/></material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="0.025 0.020 0.020"/></geometry>
+        </collision>
+        <inertial>
+            <mass value="${camera_mass}"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+        </inertial>
+    </link>
+    <joint name="wrist_camera_joint" type="fixed">
+        <parent link="arm_gripper_link"/>
+        <child link="wrist_camera_link"/>
+        <origin xyz="0.030 0 0.025" rpy="0 ${PI/6} 0"/>
+    </joint>
+
+    <!-- ================================================================
+         Gazebo IMU Sensor
+         ================================================================ -->
+    <gazebo reference="imu_link">
+        <sensor name="imu_sensor" type="imu">
+            <always_on>1</always_on>
+            <update_rate>100</update_rate>
+            <visualize>false</visualize>
+            <topic>/imu/data</topic>
+            <gz_frame_id>imu_link</gz_frame_id>
+            <imu>
+                <angular_velocity>
+                    <x><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></x>
+                    <y><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></y>
+                    <z><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></z>
+                </angular_velocity>
+                <linear_acceleration>
+                    <x><noise type="gaussian"><mean>0</mean><stddev>0.017</stddev></noise></x>
+                    <y><noise type="gaussian"><mean>0</mean><stddev>0.017</stddev></noise></y>
+                    <z><noise type="gaussian"><mean>0</mean><stddev>0.017</stddev></noise></z>
+                </linear_acceleration>
+            </imu>
+        </sensor>
+    </gazebo>
+
+    <!-- ================================================================
+         Gazebo Harmonic Mecanum Drive Plugin
+         ================================================================ -->
+    <gazebo>
+        <plugin filename="gz-sim-mecanum-drive-system" name="gz::sim::systems::MecanumDrive">
+            <front_left_joint>front_left_wheel_joint</front_left_joint>
+            <front_right_joint>front_right_wheel_joint</front_right_joint>
+            <back_left_joint>rear_left_wheel_joint</back_left_joint>
+            <back_right_joint>rear_right_wheel_joint</back_right_joint>
+            <wheel_separation>${wheel_separation_y}</wheel_separation>
+            <wheelbase>${wheel_separation_x}</wheelbase>
+            <wheel_radius>${wheel_radius}</wheel_radius>
+            <odom_publish_frequency>50</odom_publish_frequency>
+            <topic>/cmd_vel</topic>
+            <odom_topic>/odom</odom_topic>
+            <tf_topic>/tf</tf_topic>
+            <frame_id>odom</frame_id>
+            <child_frame_id>base_footprint</child_frame_id>
+        </plugin>
+
+        <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
+            <!-- Absolute topic so ros_gz_bridge can bridge it directly to /joint_states in ROS.
+                 Only wheel joints here — arm joints come from arm_driver_node (sim passthrough)
+                 remapped onto /joint_states so robot_state_publisher gets both. -->
+            <topic>/joint_states</topic>
+            <joint_name>front_left_wheel_joint</joint_name>
+            <joint_name>front_right_wheel_joint</joint_name>
+            <joint_name>rear_left_wheel_joint</joint_name>
+            <joint_name>rear_right_wheel_joint</joint_name>
+        </plugin>
+
+        <!-- NOTE: gz-sim-sensors-system and gz-sim-imu-system are world-level
+             plugins loaded in omnibot_world.sdf — do NOT duplicate here. -->
+    </gazebo>
+
+
+</robot>

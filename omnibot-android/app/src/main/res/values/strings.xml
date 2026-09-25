@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OmniBot</string>
+
+    <!-- Navigation -->
+    <string name="title_home">HOME</string>
+    <string name="title_dashboard">DASH</string>
+    <string name="title_map">MAP</string>
+    <string name="title_ai">AI</string>
+    <string name="title_controls">CTRL</string>
+    <string name="title_logs">Logs</string>
+    <string name="title_settings">SET</string>
+
+    <!-- HUD screen labels (centre of status bar) -->
+    <string name="hud_label_home">HOME SCREEN</string>
+    <string name="hud_label_dashboard">DASHBOARD</string>
+    <string name="hud_label_map">SLAM MAP</string>
+    <string name="hud_label_ai">AI INTERFACE</string>
+    <string name="hud_label_controls">ROBOT CONTROLS</string>
+    <string name="hud_label_settings">SETTINGS</string>
+
+    <!-- Connection -->
+    <string name="connection_status_connected">Connected</string>
+    <string name="connection_status_disconnected">Disconnected</string>
+    <string name="connection_status_connecting">Connecting…</string>
+    <string name="robot_ip_hint">Robot IP Address</string>
+    <string name="reconnect">Reconnect</string>
+
+    <!-- Controls -->
+    <string name="emergency_stop">EMERGENCY\nSTOP</string>
+    <string name="emergency_stop_confirm">Are you sure you want to activate emergency stop?</string>
+    <string name="mode_teleop">Teleop</string>
+    <string name="mode_autonomous">Autonomous</string>
+    <string name="mode_manual">Manual</string>
+
+    <!-- Dashboard -->
+    <string name="motor_front_left">FL</string>
+    <string name="motor_front_right">FR</string>
+    <string name="motor_back_left">BL</string>
+    <string name="motor_back_right">BR</string>
+    <string name="velocity_linear_x">Linear X: %.2f m/s</string>
+    <string name="velocity_linear_y">Linear Y: %.2f m/s</string>
+    <string name="velocity_angular">Angular: %.2f rad/s</string>
+    <string name="motor_pwm">PWM: %d</string>
+    <string name="motor_rpm">RPM: %.1f</string>
+    <string name="motor_temp">Temp: %.1f°C</string>
+
+    <!-- AI screen -->
+    <string name="ai_greeting">Hi Varun, what do you want me to do?</string>
+    <string name="ai_input_hint">Type a command…</string>
+    <string name="ai_recording_off">Dataset recording: OFF</string>
+    <string name="ai_recording_on">Dataset recording: ON  ⏺</string>
+
+    <!-- Map screen -->
+    <string name="map_tab_slam">2D SLAM</string>
+    <string name="map_tab_3d">3D Cloud</string>
+
+    <!-- Settings -->
+    <string name="settings_connection">Connection Settings</string>
+    <string name="settings_control">Control Settings</string>
+    <string name="settings_display">Display Settings</string>
+    <string name="max_linear_velocity">Max Linear Velocity</string>
+    <string name="max_angular_velocity">Max Angular Velocity</string>
+    <string name="joystick_sensitivity">Joystick Sensitivity</string>
+
+    <!-- Observability -->
+    <string name="hud_label_observability">OBSERVABILITY</string>
+    <string name="title_observability">OBSERVE</string>
+
+    <!-- OTA Updates -->
+    <string name="title_ota">OTA</string>
+    <string name="hud_label_ota">OTA UPDATES</string>
+</resources>

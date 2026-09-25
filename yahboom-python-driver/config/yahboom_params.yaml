@@ -1,0 +1,23 @@
+yahboom_driver:
+  ros__parameters:
+    # Serial connection
+    serial_port: /dev/ttyUSB0
+    baud_rate: 115200
+
+    # Wheel geometry — change these for your specific Yahboom model
+    wheel_radius: 0.04            # metres
+    wheel_separation_width: 0.215 # metres, left–right axle track
+    wheel_separation_length: 0.165 # metres, front–back wheelbase
+
+    # Velocity limits
+    max_linear_vel: 0.5   # m/s
+    max_angular_vel: 2.0  # rad/s
+
+    # Ramping: velocity step per control tick
+    ramp_step: 0.05  # m/s per tick
+
+    # Control loop frequency
+    update_hz: 20.0
+
+    # Set true to log all unknown RX packet types (useful for IMU code discovery)
+    debug_serial: false

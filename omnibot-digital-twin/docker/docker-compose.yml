@@ -1,0 +1,63 @@
+version: "3.8"
+
+# OmniBot headless simulation stack
+#
+# Services:
+#   sim       — Gazebo Harmonic (headless) + ROS 2 bridge
+#   foxglove  — Foxglove bridge (ws://localhost:8765)
+#
+# Usage:
+#   docker compose -f digital_twin/docker/docker-compose.yml up
+# Then open:
+#   https://app.foxglove.dev → Connect → ws://localhost:8765
+#
+# GPU variant (NVIDIA host):
+#   docker compose -f digital_twin/docker/docker-compose.yml \
+#     -f digital_twin/docker/docker-compose.gpu.yml up
+
+x-ros-base: &ros-base
+  build:
+    context: ../..
+    dockerfile: digital_twin/docker/Dockerfile.sim
+  network_mode: host
+  environment:
+    - ROS_DOMAIN_ID=30
+    - DISPLAY=
+  volumes:
+    - ../..:/workspaces/OmniBot:cached
+  working_dir: /workspaces/OmniBot
+
+services:
+
+  # ── Gazebo simulation + ROS bridge ─────────────────────────────────────────
+  sim:
+    <<: *ros-base
+    container_name: omnibot_sim
+    command: >
+      bash -c "
+        source /opt/ros/jazzy/setup.bash &&
+        source robot_ws/install/setup.bash 2>/dev/null || true &&
+        ros2 launch omnibot_bringup simulation.launch.py
+          rviz:=false
+          foxglove:=false
+      "
+    # Expose ROSBridge for Android app / external tooling
+    ports:
+      - "9090:9090"
+
+  # ── Foxglove bridge (browser visualisation) ────────────────────────────────
+  foxglove:
+    <<: *ros-base
+    container_name: omnibot_foxglove
+    depends_on:
+      - sim
+    command: >
+      bash -c "
+        source /opt/ros/jazzy/setup.bash &&
+        source robot_ws/install/setup.bash 2>/dev/null || true &&
+        sleep 6 &&
+        ros2 run foxglove_bridge foxglove_bridge
+          --ros-args -p port:=8765 -p address:=0.0.0.0
+      "
+    ports:
+      - "8765:8765"
