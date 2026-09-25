@@ -1,6 +1,30 @@
 <div align="center">
   <h1>🤖 OmniBot: The OhhO Reference Architecture</h1>
   <p><strong>The official open-source mobile manipulation platform by OhhO Robotics</strong></p>
+
+  <p align="center">
+    <img src="assets/PXL_20260505_121303728.jpg" width="49%" />
+    <img src="assets/PXL_20260505_121328008.jpg" width="49%" />
+  </p>
+
+  <p align="center">
+    <img src="assets/Omnibot_demo1.gif" width="49%" />
+    <img src="assets/Omnibot_demo2.gif" width="49%" />
+  </p>
+
+  <p align="center">
+    <a href="https://www.youtube.com/@varun.vaidhiya/videos">
+      <img src="https://img.shields.io/badge/YouTube-demos%20%26%20updates-red?logo=youtube&logoColor=white"/>
+    </a>
+    &nbsp;
+    <a href="https://x.com/varunvaidhiya">
+      <img src="https://img.shields.io/badge/X%20%2F%20Twitter-@varunvaidhiya-black?logo=x&logoColor=white"/>
+    </a>
+    &nbsp;
+    <img src="https://img.shields.io/badge/ROS_2-Jazzy-brightgreen"/>
+    &nbsp;
+    <img src="https://img.shields.io/badge/License-Apache_2.0-blue"/>
+  </p>
 </div>
 
 ---
