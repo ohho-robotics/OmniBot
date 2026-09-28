@@ -1,0 +1,15 @@
+Third-party notices
+
+The Apache-2.0 LICENSE at the repository root covers OhhO Robotics code in this
+tree. Vendored third-party code keeps its own licence:
+
+- omnibot-vr/Packages/com.meta.xr.sdk.core/LICENSE.md
+- omnibot-vr/Packages/com.meta.xr.sdk.interaction/LICENSE.md
+  Meta Platforms, Inc. Meta XR SDK, Oculus SDK License:
+  https://developers.meta.com/horizon/licenses/oculussdk/
+
+- omnibot-vr/Packages/com.coplaydev.unity-mcp/LICENSE
+  Copyright (c) 2025 CoplayDev. MIT License.
+  Upstream: https://github.com/CoplayDev/unity-mcp/blob/main/LICENSE
+
+mecanum-kinematics/LICENSE is the same Apache-2.0 text, kept next to that package.

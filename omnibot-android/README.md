@@ -121,21 +121,9 @@ app/src/main/
 
 ## 3D Robot Viewer Setup
 
-The **3D Robot** tab loads `robot.glb` from `app/src/main/assets/`. This binary is not
-checked in. Generate it from the URDF + STL meshes (run from the repo root):
+The **3D Robot** tab loads `robot.glb` from `omnibot-android/app/src/main/assets/`. That binary is not checked in.
 
-```bash
-pip install trimesh[easy] numpy lxml
-python tools/urdf_to_glb.py
-# Output: android_app/app/src/main/assets/robot.glb
-```
-
-Then rebuild the Android app so assets are re-packaged.
-
-The script expands `omnibot.urdf.xacro`, loads all STL meshes, applies joint origin
-transforms, and exports a GLB where every node is named after its URDF link
-(e.g. `arm_shoulder_pan`). The viewer finds nodes by name and applies live joint
-rotations from `/arm/joint_states`.
+Roadmap: `tools/urdf_to_glb.py` is not in this repository, so there is no command here to generate the GLB. If `robot.glb` is absent the viewer still shows live pose and joint angles as text overlays.
 
 If `robot.glb` is absent the viewer still shows live pose and joint angles as text
 overlays, and displays setup instructions.
@@ -176,7 +164,7 @@ finalises on stop. Status is reported on `/rosbag_recorder/status`.
 ### Steps
 
 ```bash
-# Open android_app/ in Android Studio, let Gradle sync, then:
+# Open omnibot-android/ in Android Studio, let Gradle sync, then:
 ./gradlew build
 
 # Run on device
@@ -185,15 +173,7 @@ finalises on stop. Status is reported on `/rosbag_recorder/status`.
 
 ### Robot-side prerequisites
 
-```bash
-# ROSBridge WebSocket (port 9090)
-./launch_rosbridge.sh
-# or:
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090
-
-# web_video_server for MJPEG (optional but needed for camera feed)
-ros2 run web_video_server web_video_server
-```
+Roadmap: `launch_rosbridge.sh` is not in this repository. On a robot computer that already has ROS 2 and `rosbridge_suite`, ROSBridge is `ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090`. Camera MJPEG needs `web_video_server` on that same computer. Neither is started by this Android project.
 
 ---
 
@@ -270,7 +250,7 @@ All topic and service names live in `utils/Constants.kt`.
 - [ ] **Multi-camera switcher** — Swipe between wrist / front / BEV camera on Dashboard.
 - [ ] **Foxglove debug panel** — Embedded Foxglove WebView for raw topic inspection.
 - [ ] **Unit tests for RobotRepository** — Refactor singleton to constructor DI first.
-- [ ] **CI GLB generation** — GitHub Actions step to run `tools/urdf_to_glb.py` and upload `robot.glb` as a release asset.
+- [ ] **CI GLB generation** — Roadmap. `tools/urdf_to_glb.py` is not in this repo, so CI cannot generate `robot.glb` yet.
 
 ---
 
@@ -280,9 +260,9 @@ All topic and service names live in `utils/Constants.kt`.
 |---------|-----|
 | Gradle sync failed | Check internet; **File > Invalidate Caches > Restart** |
 | Build errors | Ensure JDK 17; **Build > Clean Project** |
-| WebSocket not connecting | Verify same network; check `./launch_rosbridge.sh` is running |
+| WebSocket not connecting | Verify the same network and that ROSBridge is running on the robot. `launch_rosbridge.sh` is not in this repo. |
 | No camera image | Confirm `web_video_server` is running; check camera URL in Settings |
-| 3D viewer shows banner | Run `python tools/urdf_to_glb.py` then rebuild app |
+| 3D viewer shows banner | `robot.glb` is not checked in, and `tools/urdf_to_glb.py` is not in this repo. |
 | Robot model doesn't move | Verify `/odom` and `/arm/joint_states` are publishing |
 
 ---
