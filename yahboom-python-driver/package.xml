@@ -17,8 +17,6 @@
   <url type="repository">https://github.com/varunvaidhiya/Mecanum-Wheel-Robot</url>
   <url type="bugtracker">https://github.com/varunvaidhiya/Mecanum-Wheel-Robot/issues</url>
 
-  <buildtool_depend>ament_python</buildtool_depend>
-
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
