@@ -32,25 +32,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: README ROS commands
         shell: bash
-<<<<<<< HEAD
         run: python3 scripts/check_readme_commands.py --section ros
-=======
-        run: |
-          set -eo pipefail
-          sudo apt-get update
-          sudo apt-get install -y python3-colcon-common-extensions python3-rosdep python3-pytest
-          sudo rosdep init || true
-          rosdep update
-          source /opt/ros/jazzy/setup.bash
-          rosdep install --from-paths src --ignore-src -y --rosdistro jazzy \
-            --dependency-types=build \
-            --dependency-types=buildtool \
-            --dependency-types=build_export \
-            --dependency-types=buildtool_export \
-            --dependency-types=exec \
-            --dependency-types=test
-          colcon build --symlink-install
-          source install/setup.bash
-          colcon test --event-handlers console_direct+ --return-code-on-test-failure
-          colcon test-result --verbose
->>>>>>> cursor/ohh-21-colcon-ci-2bed
