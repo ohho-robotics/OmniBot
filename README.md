@@ -23,7 +23,7 @@
     &nbsp;
     <img src="https://img.shields.io/badge/ROS_2-Jazzy-brightgreen"/>
     &nbsp;
-    <img src="https://img.shields.io/badge/License-Apache_2.0-blue"/>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue" alt="Apache-2.0"/></a>
   </p>
 </div>
 
@@ -149,4 +149,4 @@ Ensure `ROS_DOMAIN_ID` is identical across all machines.
 ## 🤝 Contributing & License
 Contributions are welcome for hardware docs, new teleoperation methods (SpaceMouse, Web UI), and camera calibration.
 
-**License:** Apache 2.0
+**License:** [Apache-2.0](LICENSE) for OhhO code in this repository. Vendored Meta XR SDK and CoplayDev unity-mcp packages keep their own licences. See [NOTICE](NOTICE).
