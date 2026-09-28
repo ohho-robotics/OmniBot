@@ -1,7 +1,7 @@
 # GPU override — extend the base compose file on NVIDIA hosts:
 #   docker compose \
-#     -f digital_twin/docker/docker-compose.yml \
-#     -f digital_twin/docker/docker-compose.gpu.yml up
+#     -f omnibot-digital-twin/docker/docker-compose.yml \
+#     -f omnibot-digital-twin/docker/docker-compose.gpu.yml up
 #
 # Prerequisites: NVIDIA Container Toolkit
 #   https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html

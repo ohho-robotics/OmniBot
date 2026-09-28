@@ -21,6 +21,8 @@
       <img src="https://img.shields.io/badge/X%20%2F%20Twitter-@varunvaidhiya-black?logo=x&logoColor=white"/>
     </a>
     &nbsp;
+    <a href="https://github.com/ohho-robotics/OmniBot/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ohho-robotics/OmniBot/ci.yml?branch=main&label=CI" alt="CI"/></a>
+    &nbsp;
     <img src="https://img.shields.io/badge/ROS_2-Jazzy-brightgreen"/>
     &nbsp;
     <img src="https://img.shields.io/badge/License-Apache_2.0-blue"/>
@@ -81,13 +83,27 @@ To build your own OmniBot, you will need:
 - `lerobot` installed for data collection (`pip install lerobot`)
 
 ### 2. Build the Core ROS 2 Workspace
+
+From a fresh clone, at the repository root. `src/` is a colcon workspace of symlinks to the packages in this tree. Ubuntu 24.04 with ROS 2 Jazzy already installed:
+
 ```bash
-cd omnibot-ros2
+sudo apt-get update
+sudo apt-get install -y python3-colcon-common-extensions python3-rosdep python3-pytest
+sudo rosdep init || true
+rosdep update
 source /opt/ros/jazzy/setup.bash
-rosdep install --from-paths src --ignore-src -y
+rosdep install --from-paths src --ignore-src -y --rosdistro jazzy \
+  --dependency-types=build \
+  --dependency-types=buildtool \
+  --dependency-types=build_export \
+  --dependency-types=buildtool_export \
+  --dependency-types=exec \
+  --dependency-types=test
 colcon build --symlink-install
 source install/setup.bash
 ```
+
+CPU-only tests (no ROS) are the `cpu` job in `.github/workflows/ci.yml`: kinematics, Yahboom protocol, BEV homography, arm tick math, learning engine, and agent engine.
 
 ### 3. Launch Teleoperation (Xbox)
 ```bash

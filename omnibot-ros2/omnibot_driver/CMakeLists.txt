@@ -18,26 +18,8 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
-# Try to find serial package, fallback to FetchContent
-find_package(serial QUIET)
-if(NOT serial_FOUND)
-  message(STATUS "serial package not found, using FetchContent...")
-  include(FetchContent)
-  FetchContent_Declare(
-    serial_fetch
-    GIT_REPOSITORY https://github.com/RoverRobotics-forks/serial-ros2.git
-    GIT_TAG master
-  )
-  FetchContent_MakeAvailable(serial_fetch)
-  
-  # serial target is created by add_subdirectory inside MakeAvailable
-  # We need to manually add include dir because serial uses PRIVATE includes
-  include_directories(${serial_fetch_SOURCE_DIR}/include)
-  set(SERIAL_LIB serial)
-else()
-  set(SERIAL_LIB ${serial_LIBRARIES})
-endif()
-
+# The C++ controller target is not built. Serial I/O is Python (pyserial).
+# Do not FetchContent a C++ serial library at configure time.
 
 # Include directories
 include_directories(include)

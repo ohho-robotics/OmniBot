@@ -20,6 +20,11 @@ import collections
 import math
 import statistics as _statistics
 import time
+
+from arm_math import clamp_radians as _clamp_radians
+from arm_math import radians_to_ticks as _radians_to_ticks
+from arm_math import ticks_to_radians as _ticks_to_radians
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
@@ -196,24 +201,15 @@ class ArmDriverNode(Node):
 
     def ticks_to_radians(self, ticks_list):
         """Convert raw servo ticks to joint angles in radians."""
-        return [
-            (ticks - home) / self.ticks_per_rad
-            for ticks, home in zip(ticks_list, self.home_ticks)
-        ]
+        return _ticks_to_radians(ticks_list, self.home_ticks, self.ticks_per_rad)
 
     def radians_to_ticks(self, radians_list):
         """Convert joint angles in radians to servo ticks."""
-        return [
-            int(round(rad * self.ticks_per_rad + home))
-            for rad, home in zip(radians_list, self.home_ticks)
-        ]
+        return _radians_to_ticks(radians_list, self.home_ticks, self.ticks_per_rad)
 
     def clamp_radians(self, radians_list):
         """Clamp joint angles to declared limits."""
-        return [
-            max(mn, min(mx, rad))
-            for rad, mn, mx in zip(radians_list, self.joint_min, self.joint_max)
-        ]
+        return _clamp_radians(radians_list, self.joint_min, self.joint_max)
 
     # ------------------------------------------------------------------
     # Publish timer

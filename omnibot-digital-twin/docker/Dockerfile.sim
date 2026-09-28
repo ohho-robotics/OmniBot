@@ -6,7 +6,7 @@
 # Build context: repo root (so COPY paths work)
 #
 # Usage (standalone):
-#   docker build -f digital_twin/docker/Dockerfile.sim -t omnibot-sim .
+#   docker build -f omnibot-digital-twin/docker/Dockerfile.sim -t omnibot-sim .
 #   docker run --rm -it --network=host --gpus=all omnibot-sim bash
 #
 # Typical usage: via docker-compose.yml or VS Code DevContainer.
@@ -83,6 +83,6 @@ WORKDIR /workspaces/OmniBot
 # ── Shell setup ───────────────────────────────────────────────────────────────
 RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc \
     && echo "export ROS_DOMAIN_ID=30" >> ~/.bashrc \
-    && echo '[ -f /workspaces/OmniBot/robot_ws/install/setup.bash ] && source /workspaces/OmniBot/robot_ws/install/setup.bash' >> ~/.bashrc
+    && echo '[ -f /workspaces/OmniBot/install/setup.bash ] && source /workspaces/OmniBot/install/setup.bash' >> ~/.bashrc
 
 CMD ["/bin/bash"]

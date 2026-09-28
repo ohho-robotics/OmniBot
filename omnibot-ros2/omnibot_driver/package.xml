@@ -19,7 +19,8 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>tf_transformations</depend>
   <depend>sensor_msgs</depend>
-  <depend>serial</depend>
+  <!-- C++ ros-serial is not released for Jazzy and this package does not link it.
+       Python nodes import pyserial. -->
   <exec_depend>python3-serial</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>

@@ -7,19 +7,19 @@
 #
 # Prerequisites:
 #   - ROS 2 Jazzy sourced (for xacro)
-#   - robot_ws built and sourced
+#   - this repo's colcon install sourced
 #
 # Usage:
-#   source robot_ws/install/setup.bash
-#   bash digital_twin/scripts/build_usd.sh
+#   source install/setup.bash
+#   bash omnibot-digital-twin/scripts/build_usd.sh
 #   # Then follow the printed Isaac Sim instructions.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 URDF_OUT="/tmp/omnibot.urdf"
-USD_DIR="${REPO_ROOT}/robot_ws/src/omnibot_description/usd"
-XACRO_FILE="${REPO_ROOT}/robot_ws/src/omnibot_description/urdf/omnibot.urdf.xacro"
+USD_DIR="${REPO_ROOT}/omnibot-ros2/omnibot_description/usd"
+XACRO_FILE="${REPO_ROOT}/omnibot-ros2/omnibot_description/urdf/omnibot.urdf.xacro"
 
 echo "=== OmniBot USD Build Script ==="
 echo ""
@@ -27,7 +27,7 @@ echo ""
 # ── Step 1: Bake xacro → URDF ─────────────────────────────────────────────
 echo "[1/2] Baking xacro → ${URDF_OUT}"
 if ! command -v xacro &>/dev/null; then
-    echo "ERROR: xacro not found. Source robot_ws/install/setup.bash first."
+    echo "ERROR: xacro not found. Source /opt/ros/jazzy/setup.bash and install/setup.bash first."
     exit 1
 fi
 xacro "${XACRO_FILE}" -o "${URDF_OUT}"
@@ -60,5 +60,5 @@ echo ""
 echo " After importing, run setup_omnigraph.py inside Isaac Sim to wire"
 echo " the ROS 2 action graph:"
 echo "   Isaac Sim → Window → Script Editor → open + run"
-echo "   ${REPO_ROOT}/digital_twin/scripts/setup_omnigraph.py"
+echo "   ${REPO_ROOT}/omnibot-digital-twin/scripts/setup_omnigraph.py"
 echo "--------------------------------------------------------------"
