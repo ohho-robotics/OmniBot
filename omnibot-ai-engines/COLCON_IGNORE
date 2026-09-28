@@ -1,0 +1,3 @@
+# CPU engines are not a ROS workspace. data_engine/setup.py is named
+# vla_data_engine and colcon would build and test it from the repo root.
+# Its one test runs in the CPU job with PYTHONPATH=omnibot-ai-engines.

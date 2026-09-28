@@ -99,7 +99,7 @@ rosdep install --from-paths src --ignore-src -y --rosdistro jazzy \
   --dependency-types=buildtool_export \
   --dependency-types=exec \
   --dependency-types=test
-colcon build --symlink-install
+colcon build --symlink-install --base-paths src
 source install/setup.bash
 ```
 
