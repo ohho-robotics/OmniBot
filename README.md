@@ -1,91 +1,55 @@
 <div align="center">
-  <h1>🤖 OmniBot: The OhhO Reference Architecture</h1>
-  <p><strong>The official open-source mobile manipulation platform by OhhO Robotics</strong></p>
+  <h1>OmniBot</h1>
+  <p>Mecanum mobile manipulator: ROS 2 Jazzy drivers, kinematics, and a CPU-side agent loop.</p>
 
   <p align="center">
-    <img src="assets/PXL_20260505_121303728.jpg" width="49%" />
-    <img src="assets/PXL_20260505_121328008.jpg" width="49%" />
+    <img src="assets/PXL_20260505_121303728.jpg" width="49%" alt="OmniBot base and arm" />
+    <img src="assets/PXL_20260505_121328008.jpg" width="49%" alt="OmniBot side view" />
   </p>
 
   <p align="center">
-    <img src="assets/Omnibot_demo1.gif" width="49%" />
-    <img src="assets/Omnibot_demo2.gif" width="49%" />
+    <img src="assets/Omnibot_demo1.gif" width="49%" alt="OmniBot driving" />
+    <img src="assets/Omnibot_demo2.gif" width="49%" alt="OmniBot arm motion" />
   </p>
 
   <p align="center">
-    <a href="https://www.youtube.com/@varun.vaidhiya/videos">
-      <img src="https://img.shields.io/badge/YouTube-demos%20%26%20updates-red?logo=youtube&logoColor=white"/>
-    </a>
+    <a href="https://github.com/ohho-robotics/OmniBot/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ohho-robotics/OmniBot/ci.yml?branch=main&label=CI" alt="CI status for the main branch"/></a>
     &nbsp;
-    <a href="https://x.com/varunvaidhiya">
-      <img src="https://img.shields.io/badge/X%20%2F%20Twitter-@varunvaidhiya-black?logo=x&logoColor=white"/>
-    </a>
-    &nbsp;
-    <a href="https://github.com/ohho-robotics/OmniBot/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ohho-robotics/OmniBot/ci.yml?branch=main&label=CI" alt="CI"/></a>
-    &nbsp;
-    <img src="https://img.shields.io/badge/ROS_2-Jazzy-brightgreen"/>
-    &nbsp;
-    <img src="https://img.shields.io/badge/License-Apache_2.0-blue"/>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue" alt="Apache-2.0"/></a>
   </p>
 </div>
 
----
+OmniBot is the public robot repo for OhhO. The photos and GIFs above are the physical robot. The commands below are what a fresh clone can run without that robot.
 
-## 🌍 Overview
-**OmniBot** is a ROS 2 mecanum-wheel mobile-manipulation robot with embodied AI (OpenVLA / SmolVLA). This repository is the complete **meta-workspace** containing the hardware drivers, ROS 2 nodes, AI engines, digital twins, and client applications.
+## CPU-only demo
 
-This repo powers the physical hardware that runs the **OhhO OS**.
+About five minutes. No ROS, no GPU, no robot. CI runs this block on every pull request.
 
-### 🌟 Key Features
-*   **Embodied AI:** Natively runs OpenVLA and SmolVLA for high-level semantic navigation and visual-language-action tasks.
-*   **Teleoperation & Data Collection:** Built-in tools for leader-follower arm teleoperation to record episodes in HuggingFace LeRobot format.
-*   **Real-time Perception:** 4-camera stitched Bird's-Eye-View (BEV) mapping and Live MJPEG camera feeds.
-*   **Cross-Platform Clients:** Control the robot via an Android app, Xbox Controller, or a Meta Quest 3 VR headset.
+<!-- ci-commands: cpu -->
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e mecanum-kinematics -e omnibot-ai-engines/learning_engine -e omnibot-ai-engines/agent_engine -e yahboom-python-driver pytest numpy
+pytest mecanum-kinematics/tests yahboom-python-driver/tests ros2-bev-stitcher/tests omnibot-ros2/omnibot_arm/test -q
+python -m unittest discover -s omnibot-ai-engines/learning_engine/tests -t omnibot-ai-engines
+python -m unittest discover -s omnibot-ai-engines/agent_engine/tests -t omnibot-ai-engines
+PYTHONPATH=omnibot-ai-engines pytest omnibot-ai-engines/data_engine/tests -q
+python scripts/cpu_demo.py
+```
+<!-- /ci-commands -->
 
----
+`scripts/cpu_demo.py` drives the mecanum model forward at 0.30 m/s, encodes a Yahboom motion packet, and completes one scripted agent goal ("go to the kitchen"). It does not talk to hardware.
 
-## 📂 Repository Structure
-This repository contains the complete OhhO ecosystem split into modular packages:
+### Roadmap: `ohho-os`
 
-| Directory | Purpose |
-|---|---|
-| `omnibot-ros2/` | Foundational ROS 2 Jazzy workspace (navigation, SLAM, kinematics, arm control). |
-| `omnibot-ai-ros2/` | ROS 2 wrappers linking physical hardware to AI foundation models (VLA, LeRobot, RL). |
-| `omnibot-ai-engines/` | Pure Python/FastAPI backend servers for training and inference. |
-| `omnibot-digital-twin/` | High-fidelity Gazebo and Isaac Sim simulation environments. |
-| `yahboom-python-driver/` | Pure-Python protocol encoder/decoder for Yahboom boards. |
-| `ros2-bev-stitcher/` | Real-time Bird's-Eye View camera stitching. |
-| `mecanum-kinematics/` | Modular math library for omnidirectional drives. |
-| `omnibot-android/` | Kotlin MVVM Android controller app (via ROSBridge). |
-| `omnibot-vr/` | Unity Quest 3 mixed-reality teleop app. |
+`pip install ohho-os` and `ohho sim` are not on PyPI. That install is waiting on OHH-20. Do not treat it as a working command.
 
----
+## ROS 2 path
 
-## 🛠️ Hardware BOM (Bill of Materials)
-To build your own OmniBot, you will need:
-- Yahboom ROS Robot Expansion Board (mecanum drive, USB serial)
-- 4× mecanum wheels (40 mm radius)
-- **Raspberry Pi 5 (8 GB)** — The core robot brain
-- **SO-101 6-DOF arm** with 7× Feetech STS3215 servos (LeRobot compatible)
-- 5× USB cameras (4 base-mounted + 1 wrist)
-- Orbbec Astra Pro RGB-D camera (optional — depth + 3D point cloud)
-- Xbox controller (for teleoperation)
+Ubuntu 24.04 with ROS 2 Jazzy already installed. `src/` is 13 symlinks to the packages in this repo. CI runs this block in `ros:jazzy-ros-base-noble`.
 
-*Full BOM and assembly instructions can be found in the personal developer repo or `omnibot-ros2` docs.*
-
----
-
-## 🚀 Quick Start (Physical Robot)
-
-### 1. Prerequisites
-- Ubuntu 24.04 + ROS 2 Jazzy on the Raspberry Pi 5.
-- Python 3.10+
-- `lerobot` installed for data collection (`pip install lerobot`)
-
-### 2. Build the Core ROS 2 Workspace
-
-From a fresh clone, at the repository root. `src/` is a colcon workspace of symlinks to the packages in this tree. Ubuntu 24.04 with ROS 2 Jazzy already installed:
-
+<!-- ci-commands: ros -->
 ```bash
 sudo apt-get update
 sudo apt-get install -y python3-colcon-common-extensions python3-rosdep python3-pytest
@@ -101,68 +65,43 @@ rosdep install --from-paths src --ignore-src -y --rosdistro jazzy \
   --dependency-types=test
 colcon build --symlink-install --base-paths src
 source install/setup.bash
+colcon test --base-paths src --event-handlers console_direct+ --return-code-on-test-failure
+colcon test-result --verbose
 ```
+<!-- /ci-commands -->
 
-CPU-only tests (no ROS) are the `cpu` job in `.github/workflows/ci.yml`: kinematics, Yahboom protocol, BEV homography, arm tick math, learning engine, and agent engine.
+## Needs hardware or a GPU
 
-### 3. Launch Teleoperation (Xbox)
-```bash
-# Robot driver + Xbox controller (all-in-one)
-ros2 launch omnibot_bringup robot_with_joy.launch.py
-```
-*   **Hold RB:** Enable driving
-*   **Hold RT:** Turbo (2× speed)
-*   **Left stick:** Linear X / Y (strafe)
-*   **Right stick:** Rotate (angular Z)
+These trees are in the repo. They are not started by the commands above.
 
-### 4. Launch Perception & Cameras
-```bash
-# Start all cameras and BEV stitcher (run on Pi):
-ros2 launch omnibot_bringup perception.launch.py
-```
+| What | Where | Needs |
+|---|---|---|
+| Base driver and Xbox teleop | `omnibot-ros2/omnibot_bringup` | Raspberry Pi, Yahboom board on serial, controller |
+| Arm and LeRobot episode recording | `omnibot-ros2/omnibot_arm`, `omnibot-ai-ros2/omnibot_lerobot` | SO-101 arm, cameras. A public recording video is Roadmap |
+| Nav2 and SLAM | `omnibot-ros2/omnibot_navigation` | Robot or Gazebo, plus the apt packages the ROS block installs |
+| Gazebo compose | `omnibot-digital-twin/docker/docker-compose.yml` | Docker. There is no `.devcontainer` in this repo |
+| OpenVLA server | `omnibot-ai-engines/vla_engine` | NVIDIA GPU and model weights. Not installed by the CPU demo |
+| Isaac RL training | `omnibot-ai-engines/rl_engine` | Isaac Sim and a GPU |
+| Android controller | `omnibot-android/` | Android SDK, JDK 17, a device, ROSBridge on the robot |
+| Quest teleop | `omnibot-vr/` | Unity `6000.5.2f1` (see `ProjectSettings/ProjectVersion.txt`), a headset |
 
-### 5. Launch the Android App
-```bash
-# Start ROSBridge WebSocket server (port 9090)
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090
-```
-Open the Android app -> Settings -> enter your robot's IP address (e.g., `192.168.1.100`) -> Connect.
+ONNX policy playback and a LeRobot record session are not part of CI. Code for both is in the tree. A video of them running is Roadmap.
 
----
+## Layout
 
-## 🧠 LeRobot Data Collection
-Use `teleop_recorder_node` to record leader-follower demonstrations in [LeRobot HuggingFace dataset format](https://github.com/huggingface/lerobot).
+| Directory | What it is |
+|---|---|
+| `src/` | Colcon workspace (symlinks) |
+| `omnibot-ros2/` | Driver, arm, description, bringup, Nav2, hybrid mux |
+| `omnibot-ai-ros2/` | VLA, LeRobot, RL, and orchestration nodes |
+| `omnibot-ai-engines/` | Numpy learning and agent engines, plus GPU training code |
+| `mecanum-kinematics/` | Wheel inverse and forward kinematics |
+| `yahboom-python-driver/` | Yahboom serial protocol |
+| `ros2-bev-stitcher/` | Bird's-eye homography |
+| `omnibot-digital-twin/` | Gazebo world and compose files |
+| `omnibot-android/` | Kotlin controller |
+| `omnibot-vr/` | Unity Quest project |
 
-```bash
-# 1. Start cameras and BEV stitcher
-ros2 launch omnibot_bringup perception.launch.py
+## License
 
-# 2. Start arm driver (follower arm on /dev/ttyACM0, leader on /dev/ttyACM1)
-ros2 launch omnibot_arm arm.launch.py
-
-# 3. Start the recorder
-ros2 launch omnibot_lerobot teleop_record.launch.py
-```
-
-*   **Press RB** on the Xbox controller to start/stop recording an episode.
-*   **Press LB** to discard a bad episode.
-
-Episodes auto-save. You can then push them directly to Hugging Face Hub using the `lerobot` CLI.
-
----
-
-## 🌐 Multi-Machine Networking
-For heavy AI workloads, inference runs on a local GPU workstation while the Pi handles real-time control.
-Edit your network environment file:
-```bash
-WORKSTATION_IP=192.168.1.100   # Desktop / VLA Inference PC
-PI_IP=192.168.1.101            # Raspberry Pi 5
-```
-Ensure `ROS_DOMAIN_ID` is identical across all machines.
-
----
-
-## 🤝 Contributing & License
-Contributions are welcome for hardware docs, new teleoperation methods (SpaceMouse, Web UI), and camera calibration.
-
-**License:** Apache 2.0
+[Apache-2.0](LICENSE) for OhhO code in this repository. Vendored Meta XR SDK and CoplayDev unity-mcp packages keep their own licences. See [NOTICE](NOTICE).

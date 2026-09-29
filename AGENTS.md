@@ -10,6 +10,7 @@ This repository is a meta-workspace (ROS 2 robot, AI engines, Android, Unity Que
   - `python3 -m unittest discover -s omnibot-ai-engines/learning_engine/tests -t omnibot-ai-engines`
   - `python3 -m unittest discover -s omnibot-ai-engines/agent_engine/tests -t omnibot-ai-engines`
   - `PYTHONPATH=omnibot-ai-engines pytest omnibot-ai-engines/data_engine/tests` (the synchronizer test is numpy-only; do not `pip install -e` `data_engine`, its `setup.py` pulls torch)
-- There is no project linter config (no ruff, flake8, or pre-commit). `python3 -m compileall` on the Python trees is the syntax check.
-- `omnibot-ros2/omnibot_arm/test` imports `rclpy` at module load, and `omnibot_hybrid` / `omnibot_driver` tests import ROS message packages. ROS 2 Jazzy is not installed. The root README's `colcon` / `ros2 launch` flow needs Ubuntu 24.04 + ROS 2 Jazzy and, for simulation, Gazebo. `omnibot-digital-twin/docker/docker-compose.yml` still points at a missing `digital_twin/docker/Dockerfile.sim` and `robot_ws/install/setup.bash`.
+- The root README's `cpu` bash block is what CI runs (`python3 scripts/check_readme_commands.py --section cpu`). `ruff.toml` checks syntax and undefined names (`ruff check .`).
+- `pytest omnibot-ros2/omnibot_arm/test` imports `arm_math.py` and does not import `rclpy`. `omnibot_hybrid` and `omnibot_driver` tests still import ROS message packages and run under `colcon test` in the Jazzy CI job, not in this venv.
+- Colcon packages are symlinked from `src/`. Build with the README `ros` block on Ubuntu 24.04 + ROS 2 Jazzy. Compose file: `omnibot-digital-twin/docker/docker-compose.yml`. There is no `.devcontainer`.
 - `omnibot-android` needs the Android SDK and JDK 17 (`./gradlew`). `omnibot-vr` is a Unity project (`ProjectSettings/ProjectVersion.txt`). `vla_engine`, `lerobot_engine`, and `rl_engine` need GPU stacks (torch / Isaac) and are not installed.

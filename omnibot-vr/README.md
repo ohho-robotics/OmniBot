@@ -19,16 +19,17 @@ gently billboards it toward you; press **left-controller B** to hide/show it.
 
 | Tool | Version |
 |---|---|
-| Unity Editor | **2023.3.0f1 LTS** (exact) |
-| Meta XR SDK Core | 60.0.0 (via OpenUPM scoped registry) |
-| Meta XR Interaction SDK | 60.0.0 |
-| Meta XR Interaction SDK OVR | 60.0.0 |
+| Unity Editor | **6000.5.2f1** (`ProjectSettings/ProjectVersion.txt`) |
+| Meta XR SDK Core | 203.0.0 (`Packages/manifest.json`) |
+| Meta XR Interaction SDK | 203.0.0 |
+| Meta XR Interaction SDK OVR | 203.0.0 |
 | NativeWebSocket | upm branch (auto-fetched via git URL) |
-| Newtonsoft JSON | 3.2.1 (via Unity NuGet) |
+| Newtonsoft JSON | 3.2.2 |
+| OpenXR | 1.17.1 |
 | Android Build Support | Installed via Unity Hub |
 | Android SDK / NDK | API level 32+ (included with Unity Android module) |
 
-Unity packages are declared in `vr_app/Packages/manifest.json` and are
+Unity packages are declared in `omnibot-vr/Packages/manifest.json` and are
 automatically resolved on first open.
 
 ---
@@ -37,7 +38,7 @@ automatically resolved on first open.
 
 ### Meta Quest 3 / 3S (primary)
 
-- OpenXR backend via `com.unity.xr.openxr` 1.10.0
+- OpenXR backend via `com.unity.xr.openxr` 1.17.1
 - Meta OpenXR feature set (hand tracking, passthrough)
 - Android API target: 32+, ARM64
 
@@ -57,7 +58,7 @@ visionOS support is planned but not yet implemented. Architecture notes:
 
 ## 3. Build Steps for Quest
 
-1. Open `vr_app/` as a Unity project (Unity Hub → Add project from disk).
+1. Open `omnibot-vr/` as a Unity project (Unity Hub → Add project from disk).
 2. Wait for package resolution (first open takes ~2–5 minutes).
 3. Go to **Edit → Project Settings → XR Plug-in Management**.
    - Enable **OpenXR** under the Android tab.
@@ -90,16 +91,7 @@ visionOS support is planned but not yet implemented. Architecture notes:
    (default `192.168.1.101`) and port (default `9090`) → **Connect**.
    The status dot turns green when connected.
 
-The robot-side stack needs ROSBridge (port 9090), the VR bridge (port 8765)
-and web_video_server (port 8080). Start all of it with **one command** from
-the repo root:
-
-```bash
-./launch_vr_teleop.sh   # mobile manipulation + ROSBridge + VR bridge + web_video_server
-```
-
-(or individually: `./launch_rosbridge.sh`, or
-`ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090`)
+The robot-side stack, when it exists, needs ROSBridge (port 9090) and a camera server. Roadmap: `launch_vr_teleop.sh` and `launch_rosbridge.sh` are not in this repository. A ROS package named `omnibot_vr` is not in this repository either.
 
 ---
 
@@ -208,28 +200,7 @@ After recording, export episodes to the robot for training:
 
 ## 9. Launching the ROS VR Bridge
 
-> Easiest: `./launch_vr_teleop.sh` from the repo root starts the bridge
-> along with everything else (mobile manipulation, ROSBridge, web_video_server).
-
-On the robot PC (or VLA desktop), standalone:
-
-```bash
-# Install dependency (if not already present)
-pip install aiohttp
-
-# Build the workspace (first time)
-cd robot_ws
-colcon build --packages-select omnibot_vr --symlink-install
-source install/setup.bash
-
-# Launch
-ros2 launch omnibot_vr vr_bridge.launch.py
-
-# Custom upload directory and port
-ros2 launch omnibot_vr vr_bridge.launch.py \
-    upload_dir:=~/datasets/vr_episodes \
-    http_port:=8765
-```
+Roadmap. `launch_vr_teleop.sh` and a ROS package named `omnibot_vr` are not in this repository. Do not run those commands against this tree. The Quest app in `omnibot-vr/` talks to ROSBridge; the bridge package it documents is not here.
 
 The bridge provides:
 - `GET  http://<robot>:8765/health` — health check
@@ -262,7 +233,7 @@ The visionOS port is planned for a future release. Key design decisions:
 ## 11. Project Structure
 
 ```
-vr_app/
+omnibot-vr/
 ├── Assets/
 │   ├── scene1.unity            # THE app scene (build this one)
 │   ├── Scripts/
