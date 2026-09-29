@@ -7,20 +7,19 @@ cd /workspaces/OmniBot
 
 echo "=== Installing rosdep dependencies ==="
 source /opt/ros/jazzy/setup.bash
-cd robot_ws
-rosdep install --from-paths src --ignore-src -y --rosdistro jazzy
+rosdep install --from-paths src --ignore-src -y --rosdistro jazzy \
+  --dependency-types=build \
+  --dependency-types=buildtool \
+  --dependency-types=build_export \
+  --dependency-types=buildtool_export \
+  --dependency-types=exec \
+  --dependency-types=test
 
-echo "=== Installing standalone Python packages ==="
-cd /workspaces/OmniBot
-pip3 install -e packages/yahboom_ros2 \
-             -e packages/vla_serve \
-             -e packages/robot_episode_dataset \
-             -e packages/ros2_bev_stitcher \
-             -e packages/mecanum_drive_ros2
+echo "=== Installing standalone Python packages that live in this repo ==="
+pip3 install -e mecanum-kinematics -e yahboom-python-driver
 
 echo "=== Building ROS 2 workspace ==="
-cd /workspaces/OmniBot/robot_ws
 colcon build --symlink-install
 
 echo "=== Done! Source the workspace: ==="
-echo "  source /workspaces/OmniBot/robot_ws/install/setup.bash"
+echo "  source /workspaces/OmniBot/install/setup.bash"

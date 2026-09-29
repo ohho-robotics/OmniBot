@@ -7,7 +7,7 @@ A contributor-ready simulation environment for working on OmniBot without physic
 ## Directory Layout
 
 ```
-digital_twin/
+omnibot-digital-twin/
 ├── README.md                        # this file
 ├── worlds/
 │   ├── omnibot_lab.sdf              # rich indoor lab (table, shelf, YCB objects)
@@ -37,32 +37,19 @@ digital_twin/
 
 ## Quick-Start (Gazebo Simulation)
 
-### Option A — VS Code DevContainer (recommended)
-1. Install [VS Code](https://code.visualstudio.com/) and the
-   [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers).
-2. `git clone https://github.com/varunvaidhiya/OmniBot && cd OmniBot`
-3. Open VS Code → **Reopen in Container**. The root `.devcontainer/devcontainer.json`
-   builds `digital_twin/docker/Dockerfile.sim` and runs `docker/post_create.sh`,
-   which installs deps and runs `colcon build` automatically.
-4. Inside the container:
-   ```bash
-   source robot_ws/install/setup.bash
-   ros2 launch omnibot_bringup simulation.launch.py
-   ```
-   The DevContainer enables GPU passthrough via `--gpus=all` on Linux hosts;
-   remove those `runArgs` on Windows/Mac (see the comment in `devcontainer.json`).
+### Option A — VS Code DevContainer
+
+Roadmap. This repo has no `.devcontainer/devcontainer.json`. Do not expect "Reopen in Container" to work.
 
 ### Option B — Docker Compose (headless)
-```bash
-# Gazebo renders off-screen, Foxglove serves in browser
-docker compose -f digital_twin/docker/docker-compose.yml up
-# Open https://app.foxglove.dev → Connect → ws://localhost:8765
 
-# NVIDIA host (GPU-accelerated Gazebo) — layer the GPU override:
-docker compose \
-  -f digital_twin/docker/docker-compose.yml \
-  -f digital_twin/docker/docker-compose.gpu.yml up
+The compose file builds `omnibot-digital-twin/docker/Dockerfile.sim` and sources `install/setup.bash` from a colcon build at the repo root. Image build pulls Gazebo and Nav2 and is not part of the GitHub Actions CPU job.
+
+```bash
+docker compose -f omnibot-digital-twin/docker/docker-compose.yml up
 ```
+
+NVIDIA hosts can add `-f omnibot-digital-twin/docker/docker-compose.gpu.yml`. Foxglove, if that service starts, listens on `ws://localhost:8765`.
 
 The compose `sim` service launches `simulation.launch.py rviz:=false foxglove:=false`
 and runs `foxglove_bridge` as a separate service; ROSBridge (port 9090) is exposed
@@ -72,7 +59,8 @@ for the Android app.
 ```bash
 # Prerequisites: ROS 2 Jazzy, Gazebo Harmonic, foxglove_bridge
 sudo apt install ros-jazzy-desktop ros-jazzy-ros-gz ros-jazzy-foxglove-bridge
-cd robot_ws && colcon build --symlink-install && source install/setup.bash
+# From the repo root, after the ROS 2 quick start in the root README
+source install/setup.bash
 ros2 launch omnibot_bringup simulation.launch.py
 ```
 
@@ -100,15 +88,15 @@ ros2 launch omnibot_bringup simulation.launch.py
 # Open:
 https://app.foxglove.dev
 # Connect: ws://localhost:8765
-# Import layout: digital_twin/configs/foxglove/omnibot_layout.json
+# Import layout: omnibot-digital-twin/configs/foxglove/omnibot_layout.json
 ```
 
 ### RViz 2 (desktop)
 ```bash
 # Per-domain configs:
-rviz2 -d digital_twin/configs/rviz/perception.rviz
-rviz2 -d digital_twin/configs/rviz/navigation.rviz
-rviz2 -d digital_twin/configs/rviz/manipulation.rviz
+rviz2 -d omnibot-digital-twin/configs/rviz/perception.rviz
+rviz2 -d omnibot-digital-twin/configs/rviz/navigation.rviz
+rviz2 -d omnibot-digital-twin/configs/rviz/manipulation.rviz
 ```
 
 ---
@@ -117,13 +105,13 @@ rviz2 -d digital_twin/configs/rviz/manipulation.rviz
 
 | World | Use Case | File |
 |-------|----------|------|
-| `omnibot_world.sdf` (default) | Basic physics + sensor test | `robot_ws/src/omnibot_bringup/worlds/` |
-| `omnibot_lab.sdf` | Manipulation + navigation with objects | `digital_twin/worlds/` |
+| `omnibot_world.sdf` (default) | Basic physics + sensor test | `omnibot-ros2/omnibot_bringup/worlds/` |
+| `omnibot_lab.sdf` | Manipulation + navigation with objects | `omnibot-digital-twin/worlds/` |
 
 To launch with the lab world (run from the repo root):
 ```bash
 ros2 launch omnibot_bringup simulation.launch.py \
-  world:=$(pwd)/digital_twin/worlds/omnibot_lab.sdf
+  world:=$(pwd)/omnibot-digital-twin/worlds/omnibot_lab.sdf
 ```
 
 ---
@@ -137,13 +125,13 @@ Prerequisites:
 
 ```bash
 # 1. Generate the USD asset (run once per URDF change)
-bash digital_twin/scripts/build_usd.sh
+bash omnibot-digital-twin/scripts/build_usd.sh
 
 # 2. Start Isaac Sim with ROS 2 bridge enabled (via GUI or:)
 #    ~/.local/share/ov/pkg/isaac-sim-*/isaac-sim.sh --enable omni.isaac.ros2_bridge
 
 # 3. In Isaac Sim Script Editor, run:
-#    digital_twin/scripts/setup_omnigraph.py
+#    omnibot-digital-twin/scripts/setup_omnigraph.py
 
 # 4. Launch ROS 2 side
 ros2 launch omnibot_bringup isaac_sim.launch.py
@@ -180,5 +168,5 @@ overrides for cleaner costmaps in Gazebo:
 
 ```bash
 ros2 launch omnibot_navigation autonomous_robot.launch.py \
-  params_file:=$(pwd)/digital_twin/configs/nav2_sim_params.yaml
+  params_file:=$(pwd)/omnibot-digital-twin/configs/nav2_sim_params.yaml
 ```

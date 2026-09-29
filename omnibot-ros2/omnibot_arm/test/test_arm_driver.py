@@ -1,12 +1,11 @@
 """
-Unit tests for ArmDriverNode — tick↔radian conversions and joint clamping.
+Unit tests for SO-101 tick↔radian conversions and joint clamping.
 
 Wrong conversions move servos to unintended positions and can damage the arm,
 so these are safety-critical regressions to catch on every PR.
 
-All tests run against the real class methods using a lightweight stub that
-provides only the geometric/limit attributes — no rclpy.init() needed,
-no hardware, no LeRobot.
+Tests import arm_math only. That module has no ROS dependency, so this file
+does not import rclpy at module load. ArmDriverNode calls the same functions.
 """
 
 import math
@@ -15,12 +14,11 @@ import sys
 
 import pytest
 
-# Add scripts/ to sys.path so the module is importable without being installed.
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts"))
 )
 
-import arm_driver_node as _mod  # noqa: E402 — must come after sys.path patch
+import arm_math  # noqa: E402 — must come after sys.path patch
 
 TICKS_PER_REV = 4096
 TICKS_PER_RAD = TICKS_PER_REV / (2.0 * math.pi)
@@ -30,7 +28,7 @@ JOINT_MAX = [3.14, 1.57, 1.57, 1.57, 3.14, 0.8]
 
 
 class _Stub:
-    """Provides only the attributes the conversion methods read from self."""
+    """Geometry the driver node passes into arm_math."""
 
     ticks_per_rev = TICKS_PER_REV
     home_ticks = HOME_TICKS
@@ -38,9 +36,14 @@ class _Stub:
     joint_max = JOINT_MAX
     ticks_per_rad = TICKS_PER_RAD
 
-    ticks_to_radians = _mod.ArmDriverNode.ticks_to_radians
-    radians_to_ticks = _mod.ArmDriverNode.radians_to_ticks
-    clamp_radians = _mod.ArmDriverNode.clamp_radians
+    def ticks_to_radians(self, ticks_list):
+        return arm_math.ticks_to_radians(ticks_list, self.home_ticks, self.ticks_per_rad)
+
+    def radians_to_ticks(self, radians_list):
+        return arm_math.radians_to_ticks(radians_list, self.home_ticks, self.ticks_per_rad)
+
+    def clamp_radians(self, radians_list):
+        return arm_math.clamp_radians(radians_list, self.joint_min, self.joint_max)
 
 
 @pytest.fixture

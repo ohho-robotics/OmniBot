@@ -30,10 +30,4 @@ install(
   DESTINATION share/${PROJECT_NAME}/config
 )
 
-# ── Install launch files ─────────────────────────────────────────────────────
-install(
-  DIRECTORY launch/
-  DESTINATION share/${PROJECT_NAME}/launch
-)
-
 ament_package()
