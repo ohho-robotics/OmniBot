@@ -12,4 +12,18 @@ tree. Vendored third-party code keeps its own licence:
   Copyright (c) 2025 CoplayDev. MIT License.
   Upstream: https://github.com/CoplayDev/unity-mcp/blob/main/LICENSE
 
+- omnibot-vr/Packages/com.meta.xr.sdk.interaction/Runtime/ThirdParty/
+- omnibot-vr/Packages/com.meta.xr.sdk.interaction/Runtime/Sample/ThirdParty/
+  Further notices shipped inside the Meta XR Interaction package.
+
+- omnibot-vr/Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt
+  SIL Open Font License 1.1.
+
+- omnibot-vr/Assets/TextMesh Pro/Examples & Extras/Fonts/
+  Anton, Bangers, Oswald, and Unity: SIL Open Font License 1.1 (OFL.txt beside each font).
+  Roboto-Bold: Apache-2.0 (Roboto-Bold - License.txt and Roboto-Bold - AFL.txt).
+
+- omnibot-android/gradle/wrapper/gradle-wrapper.jar
+  Gradle wrapper. gradlew and gradlew.bat are Apache-2.0.
+
 mecanum-kinematics/LICENSE is the same Apache-2.0 text, kept next to that package.
