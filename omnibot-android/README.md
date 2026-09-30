@@ -289,7 +289,7 @@ All topic and service names live in `utils/Constants.kt`.
 
 ## License
 
-MIT
+[Apache-2.0](../LICENSE).
 
 ## Contact
 
