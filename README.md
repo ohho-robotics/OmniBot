@@ -105,7 +105,7 @@ ros2 launch omnibot_bringup sim.launch.py world:=flat
 
 `world:=apartment` loads a single room with a kitchen (counter, stove, fridge), a desk, and a door. Launch file: [`omnibot-ros2/omnibot_bringup/launch/sim.launch.py`](omnibot-ros2/omnibot_bringup/launch/sim.launch.py). The mecanum chassis is driven in the plane (`drive:=planar` by default; `drive:=mecanum` selects the MecanumDrive plugin). Sensors in this launch are a 2D lidar, the front RGB camera, and the IMU.
 
-`ros_gz_bridge` topics, also the set a later rosbridge client can use (this launch does not start rosbridge):
+`ros_gz_bridge` topics. `rosbridge:=true` (the default) also starts `rosbridge_websocket` on port 9090. The sim-smoke test passes `rosbridge:=false` and does not start rosbridge:
 
 | Topic | Type |
 |---|---|
@@ -125,6 +125,18 @@ Eight frames from `/camera/front/image_raw` saved by that test (`OMNIBOT_SIM_FRA
 <p align="center">
   <img src="assets/omnibot_gazebo_flat.gif" width="320" alt="Front camera frames from the flat Gazebo world while the robot drives"/>
 </p>
+
+## Teleop from the website
+
+[OHH-89](https://linear.app/ohho-robotics/issue/OHH-89) is the website issue for Connect. Start the flat Gazebo world, then open Connect and set the ROSBridge URL to `ws://localhost:9090`. The launch does not exit, so the docs-test job skips this fence.
+
+<!-- docs-test: skip ros -->
+```bash
+# omnibot-docs-test: skip ros
+ros2 launch omnibot_bringup sim.launch.py world:=flat
+```
+
+`/cmd_vel` moves the base, `/odom` publishes, and `/camera/front/image_raw` publishes when the camera sensor starts. `world:=apartment` stays the furnished world.
 
 The requirement files below pull GPU stacks. Docs-test skips them.
 

@@ -1,5 +1,6 @@
-# ROS topics sim.launch.py exposes for a later rosbridge client (OHH-92).
-# This file does not start rosbridge_server. The smoke test does not need it.
+# Topics bridged by sim.launch.py. rosbridge_websocket on port 9090 is started
+# by that launch only when rosbridge:=true (the default). This file does not
+# start rosbridge_server. The smoke test passes rosbridge:=false.
 #
 #   /cmd_vel                     geometry_msgs/msg/Twist       (ROS -> GZ, drives the base)
 #   /odom                        nav_msgs/msg/Odometry

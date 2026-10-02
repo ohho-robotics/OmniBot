@@ -34,7 +34,12 @@ def generate_test_description():
         [
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(launch_file),
-                launch_arguments={"world": "flat", "gui": "false", "drive": "planar"}.items(),
+                launch_arguments={
+                    "world": "flat",
+                    "gui": "false",
+                    "drive": "planar",
+                    "rosbridge": "false",
+                }.items(),
             ),
             launch_testing.actions.ReadyToTest(),
         ]
