@@ -24,6 +24,11 @@
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>omnibot_arm</exec_depend>
 
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>geometry_msgs</test_depend>
+  <test_depend>nav_msgs</test_depend>
+  <test_depend>sensor_msgs</test_depend>
+
   <!-- Digital twin extras (simulation.launch.py) -->
   <!-- /scan from Astra Pro depth (no physical lidar on OmniBot) -->
   <exec_depend>depthimage_to_laserscan</exec_depend>

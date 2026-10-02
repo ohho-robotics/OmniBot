@@ -3,6 +3,23 @@
 
     <xacro:property name="PI" value="3.1415926535897931"/>
 
+    <!-- sim.launch.py passes drive:=planar lidar:=true minimal_sensors:=true.
+         Defaults keep the desktop simulation.launch.py model unchanged:
+         mecanum-drive plugin, no lidar, every camera sensor enabled. -->
+    <xacro:arg name="drive" default="mecanum"/>
+    <xacro:arg name="lidar" default="false"/>
+    <xacro:arg name="minimal_sensors" default="false"/>
+    <xacro:property name="enable_extra_cameras" value="true"/>
+    <xacro:property name="front_cam_width" value="640"/>
+    <xacro:property name="front_cam_height" value="480"/>
+    <xacro:property name="front_cam_rate" value="30"/>
+    <xacro:if value="$(arg minimal_sensors)">
+        <xacro:property name="enable_extra_cameras" value="false"/>
+        <xacro:property name="front_cam_width" value="160"/>
+        <xacro:property name="front_cam_height" value="120"/>
+        <xacro:property name="front_cam_rate" value="5"/>
+    </xacro:if>
+
     <!-- ================================================================
          Chassis — two black aluminium plates separated by 8 standoffs.
          Bottom plate = base_link.
@@ -189,7 +206,7 @@
          sitting flat on its top surface. Each camera faces outward horizontally.
          FOV: 100° (1.745 rad), 1280×720, USB UVC.
          ================================================================ -->
-    <xacro:macro name="base_camera" params="prefix x_pos y_pos yaw_angle">
+    <xacro:macro name="base_camera" params="prefix x_pos y_pos yaw_angle with_sensor:=true cam_width:=640 cam_height:=480 cam_rate:=30">
         <link name="${prefix}_camera_link">
             <visual>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -226,18 +243,19 @@
                     rpy="0 0 ${yaw_angle}"/>
         </joint>
 
+        <xacro:if value="${with_sensor}">
         <gazebo reference="${prefix}_camera_link">
             <sensor name="${prefix}_camera_sensor" type="camera">
                 <always_on>1</always_on>
-                <update_rate>30</update_rate>
+                <update_rate>${cam_rate}</update_rate>
                 <visualize>false</visualize>
                 <topic>/camera/${prefix}/image_raw</topic>
                 <gz_frame_id>${prefix}_camera_link</gz_frame_id>
                 <camera>
                     <horizontal_fov>1.745</horizontal_fov>
                     <image>
-                        <width>640</width>
-                        <height>480</height>
+                        <width>${cam_width}</width>
+                        <height>${cam_height}</height>
                         <format>R8G8B8</format>
                     </image>
                     <clip>
@@ -247,28 +265,36 @@
                 </camera>
             </sensor>
         </gazebo>
+        </xacro:if>
     </xacro:macro>
 
     <!-- Cameras on top of the base plate, near each edge, facing outward -->
     <xacro:base_camera prefix="front"
         x_pos="${chassis_length / 2.0 - camera_size_x / 2.0}"
         y_pos="0"
-        yaw_angle="0"/>
+        yaw_angle="0"
+        with_sensor="true"
+        cam_width="${front_cam_width}"
+        cam_height="${front_cam_height}"
+        cam_rate="${front_cam_rate}"/>
 
     <xacro:base_camera prefix="rear"
         x_pos="${-(chassis_length / 2.0 - camera_size_x / 2.0)}"
         y_pos="0"
-        yaw_angle="${PI}"/>
+        yaw_angle="${PI}"
+        with_sensor="${enable_extra_cameras}"/>
 
     <xacro:base_camera prefix="left"
         x_pos="0"
         y_pos="${chassis_width / 2.0 - camera_size_x / 2.0}"
-        yaw_angle="${PI/2}"/>
+        yaw_angle="${PI/2}"
+        with_sensor="${enable_extra_cameras}"/>
 
     <xacro:base_camera prefix="right"
         x_pos="0"
         y_pos="${-(chassis_width / 2.0 - camera_size_x / 2.0)}"
-        yaw_angle="${-PI/2}"/>
+        yaw_angle="${-PI/2}"
+        with_sensor="${enable_extra_cameras}"/>
 
     <!-- ================================================================
          Orbbec Astra Pro Depth Camera
@@ -323,6 +349,7 @@
         <origin xyz="0 0 0" rpy="${-PI/2} 0 ${-PI/2}"/>
     </joint>
 
+    <xacro:if value="${enable_extra_cameras}">
     <gazebo reference="depth_camera_link">
         <sensor name="astra_pro_sensor" type="rgbd_camera">
             <always_on>1</always_on>
@@ -349,6 +376,7 @@
             </camera>
         </sensor>
     </gazebo>
+    </xacro:if>
 
     <!-- ================================================================
          Backwards-compat camera_link for simulation.launch.py
@@ -381,6 +409,7 @@
         <origin xyz="0 0 ${plate_thickness / 2.0 + 0.015}" rpy="0 0 0"/>
     </joint>
 
+    <xacro:if value="${enable_extra_cameras}">
     <gazebo reference="camera_link">
         <sensor name="camera_sensor" type="camera">
             <always_on>1</always_on>
@@ -402,6 +431,7 @@
             </camera>
         </sensor>
     </gazebo>
+    </xacro:if>
 
     <!-- ================================================================
          IMU — Yahboom board MPU9250 (mounted between plates, at centre)
@@ -957,6 +987,25 @@
          Gazebo Harmonic Mecanum Drive Plugin
          ================================================================ -->
     <gazebo>
+        <!-- drive:=planar (sim.launch.py): kinematic planar move on the
+             mecanum chassis. VelocityControl consumes gz /cmd_vel (vx, vy, wz)
+             and OdometryPublisher writes gz /odom. Wheel joints stay in the
+             model; this path does not fight MecanumDrive. -->
+        <xacro:if value="${'$(arg drive)' == 'planar'}">
+        <plugin filename="gz-sim-velocity-control-system" name="gz::sim::systems::VelocityControl">
+            <topic>/cmd_vel</topic>
+        </plugin>
+        <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+            <odom_frame>odom</odom_frame>
+            <robot_base_frame>base_footprint</robot_base_frame>
+            <odom_publish_frequency>50</odom_publish_frequency>
+            <odom_topic>/odom</odom_topic>
+            <tf_topic>/tf</tf_topic>
+            <dimensions>2</dimensions>
+        </plugin>
+        </xacro:if>
+        <!-- drive:=mecanum (default): gz-sim mecanum drive, holonomic /cmd_vel. -->
+        <xacro:unless value="${'$(arg drive)' == 'planar'}">
         <plugin filename="gz-sim-mecanum-drive-system" name="gz::sim::systems::MecanumDrive">
             <front_left_joint>front_left_wheel_joint</front_left_joint>
             <front_right_joint>front_right_wheel_joint</front_right_joint>
@@ -966,12 +1015,17 @@
             <wheelbase>${wheel_separation_x}</wheelbase>
             <wheel_radius>${wheel_radius}</wheel_radius>
             <odom_publish_frequency>50</odom_publish_frequency>
+            <min_linear_acceleration>-2.0</min_linear_acceleration>
+            <max_linear_acceleration>2.0</max_linear_acceleration>
+            <min_linear_velocity>-1.0</min_linear_velocity>
+            <max_linear_velocity>1.0</max_linear_velocity>
             <topic>/cmd_vel</topic>
             <odom_topic>/odom</odom_topic>
             <tf_topic>/tf</tf_topic>
             <frame_id>odom</frame_id>
             <child_frame_id>base_footprint</child_frame_id>
         </plugin>
+        </xacro:unless>
 
         <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
             <!-- Absolute topic so ros_gz_bridge can bridge it directly to /joint_states in ROS.
@@ -985,8 +1039,62 @@
         </plugin>
 
         <!-- NOTE: gz-sim-sensors-system and gz-sim-imu-system are world-level
-             plugins loaded in omnibot_world.sdf — do NOT duplicate here. -->
+             plugins loaded in the world SDF — do NOT duplicate here. -->
     </gazebo>
 
+    <!-- 2D lidar. Off unless lidar:=true (sim.launch.py). -->
+    <xacro:if value="$(arg lidar)">
+        <link name="lidar_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry><cylinder radius="0.035" length="0.04"/></geometry>
+                <material name="lidar_black"><color rgba="0.05 0.05 0.05 1"/></material>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry><cylinder radius="0.035" length="0.04"/></geometry>
+            </collision>
+            <inertial>
+                <mass value="0.1"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="4e-5" ixy="0" ixz="0" iyy="4e-5" iyz="0" izz="6e-5"/>
+            </inertial>
+        </link>
+        <joint name="lidar_joint" type="fixed">
+            <parent link="top_plate_link"/>
+            <child link="lidar_link"/>
+            <origin xyz="${chassis_length / 2.0 - 0.03} 0 ${plate_thickness / 2.0 + 0.08}" rpy="0 0 0"/>
+        </joint>
+        <gazebo reference="lidar_link">
+            <sensor name="lidar_2d" type="gpu_lidar">
+                <always_on>1</always_on>
+                <update_rate>10</update_rate>
+                <visualize>false</visualize>
+                <topic>/scan</topic>
+                <gz_frame_id>lidar_link</gz_frame_id>
+                <ray>
+                    <scan>
+                        <horizontal>
+                            <samples>180</samples>
+                            <resolution>1</resolution>
+                            <min_angle>-3.14159</min_angle>
+                            <max_angle>3.14159</max_angle>
+                        </horizontal>
+                        <vertical>
+                            <samples>1</samples>
+                            <resolution>1</resolution>
+                            <min_angle>0</min_angle>
+                            <max_angle>0</max_angle>
+                        </vertical>
+                    </scan>
+                    <range>
+                        <min>0.15</min>
+                        <max>12.0</max>
+                        <resolution>0.01</resolution>
+                    </range>
+                </ray>
+            </sensor>
+        </gazebo>
+    </xacro:if>
 
 </robot>

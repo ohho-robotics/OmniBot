@@ -19,6 +19,17 @@ if(BUILD_TESTING)
   # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+
+  # Headless Gazebo launch test. The sim-smoke CI job exports
+  # OMNIBOT_SIM_SMOKE=1 before configure. The default colcon test job
+  # does not, so it does not start Gazebo.
+  if("$ENV{OMNIBOT_SIM_SMOKE}" STREQUAL "1")
+    find_package(launch_testing_ament_cmake REQUIRED)
+    add_launch_test(
+      test/test_sim_launch.py
+      TIMEOUT 240
+    )
+  endif()
 endif()
 
 # Install launch files (including master/ subfolder)
