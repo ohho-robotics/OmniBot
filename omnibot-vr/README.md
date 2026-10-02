@@ -19,16 +19,17 @@ gently billboards it toward you; press **left-controller B** to hide/show it.
 
 | Tool | Version |
 |---|---|
-| Unity Editor | **2023.3.0f1 LTS** (exact) |
-| Meta XR SDK Core | 60.0.0 (via OpenUPM scoped registry) |
-| Meta XR Interaction SDK | 60.0.0 |
-| Meta XR Interaction SDK OVR | 60.0.0 |
-| NativeWebSocket | upm branch (auto-fetched via git URL) |
-| Newtonsoft JSON | 3.2.1 (via Unity NuGet) |
+| Unity Editor | **6000.5.2f1** ([`ProjectSettings/ProjectVersion.txt`](ProjectSettings/ProjectVersion.txt)) |
+| Meta XR SDK Core | 203.0.0 ([`Packages/manifest.json`](Packages/manifest.json)) |
+| Meta XR Interaction SDK | 203.0.0 |
+| Meta XR Interaction SDK OVR | 203.0.0 |
+| NativeWebSocket | upm branch (git URL in the manifest) |
+| Newtonsoft JSON | 3.2.2 |
+| OpenXR | 1.17.1 |
 | Android Build Support | Installed via Unity Hub |
 | Android SDK / NDK | API level 32+ (included with Unity Android module) |
 
-Unity packages are declared in `vr_app/Packages/manifest.json` and are
+Unity packages are declared in [`Packages/manifest.json`](Packages/manifest.json) and are
 automatically resolved on first open.
 
 ---
@@ -37,7 +38,7 @@ automatically resolved on first open.
 
 ### Meta Quest 3 / 3S (primary)
 
-- OpenXR backend via `com.unity.xr.openxr` 1.10.0
+- OpenXR backend via `com.unity.xr.openxr` 1.17.1 ([`Packages/manifest.json`](Packages/manifest.json))
 - Meta OpenXR feature set (hand tracking, passthrough)
 - Android API target: 32+, ARM64
 
@@ -57,7 +58,7 @@ visionOS support is planned but not yet implemented. Architecture notes:
 
 ## 3. Build Steps for Quest
 
-1. Open `vr_app/` as a Unity project (Unity Hub → Add project from disk).
+1. Open [`omnibot-vr/`](.) as a Unity project (Unity Hub → Add project from disk).
 2. Wait for package resolution (first open takes ~2–5 minutes).
 3. Go to **Edit → Project Settings → XR Plug-in Management**.
    - Enable **OpenXR** under the Android tab.
@@ -90,16 +91,7 @@ visionOS support is planned but not yet implemented. Architecture notes:
    (default `192.168.1.101`) and port (default `9090`) → **Connect**.
    The status dot turns green when connected.
 
-The robot-side stack needs ROSBridge (port 9090), the VR bridge (port 8765)
-and web_video_server (port 8080). Start all of it with **one command** from
-the repo root:
-
-```bash
-./launch_vr_teleop.sh   # mobile manipulation + ROSBridge + VR bridge + web_video_server
-```
-
-(or individually: `./launch_rosbridge.sh`, or
-`ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090`)
+The headset client connects with [`ROSBridgeClient.cs`](Assets/Scripts/Core/ROSBridgeClient.cs). This repository does not contain `launch_vr_teleop.sh` or `launch_rosbridge.sh`. Recording export posts to port 8765 from [`TeleopHudController.cs`](Assets/Scripts/UI/TeleopHudController.cs); a ROS package named `omnibot_vr` is not in this tree.
 
 ---
 
@@ -201,46 +193,15 @@ After recording, export episodes to the robot for training:
 
 1. Ensure the robot VR bridge is running (see section 9).
 2. Press **Export to Robot** in the Teleop page.
-3. Each JSONL file is uploaded via HTTP POST to `http://<robotIp>:8765/upload_episode`.
-4. Files are saved to `~/datasets/vr_episodes/` on the robot PC.
+3. **Export to Robot** POSTs the JSONL to `http://<robotIp>:8765/upload_episode` ([`TeleopHudController.cs`](Assets/Scripts/UI/TeleopHudController.cs)). The server for that POST is not in this repository.
 
 ---
 
-## 9. Launching the ROS VR Bridge
+## 9. Robot-side bridge
 
-> Easiest: `./launch_vr_teleop.sh` from the repo root starts the bridge
-> along with everything else (mobile manipulation, ROSBridge, web_video_server).
+This repository does not contain `launch_vr_teleop.sh`, `launch_rosbridge.sh`, or a ROS package named `omnibot_vr`. The Quest project is this directory ([`Packages/manifest.json`](Packages/manifest.json), [`ProjectSettings/ProjectVersion.txt`](ProjectSettings/ProjectVersion.txt)).
 
-On the robot PC (or VLA desktop), standalone:
-
-```bash
-# Install dependency (if not already present)
-pip install aiohttp
-
-# Build the workspace (first time)
-cd robot_ws
-colcon build --packages-select omnibot_vr --symlink-install
-source install/setup.bash
-
-# Launch
-ros2 launch omnibot_vr vr_bridge.launch.py
-
-# Custom upload directory and port
-ros2 launch omnibot_vr vr_bridge.launch.py \
-    upload_dir:=~/datasets/vr_episodes \
-    http_port:=8765
-```
-
-The bridge provides:
-- `GET  http://<robot>:8765/health` — health check
-- `POST http://<robot>:8765/upload_episode` — multipart form upload (field: `file`)
-
-It also bridges the VR app's ROS recording signals to `teleop_recorder_node`:
-- `/vr/record_start` (`std_msgs/String`) — episode name → start recording
-- `/vr/record_stop` (`std_msgs/Bool`) — `true` = save, `false` = discard
-
-and mirrors `/arm/joint_states`, `/odom`, and `/cmd_vel/teleop` to `/vr/obs`
-(JSON string) for any external VR monitoring tools.
+[`TeleopHudController.cs`](Assets/Scripts/UI/TeleopHudController.cs) and [`RecordingPanel.cs`](Assets/Scripts/UI/RecordingPanel.cs) POST episode JSONL to `http://<robotIp>:8765/upload_episode`. The process that would accept that upload is not in this repository.
 
 ---
 
@@ -262,9 +223,11 @@ The visionOS port is planned for a future release. Key design decisions:
 ## 11. Project Structure
 
 ```
-vr_app/
+omnibot-vr/
 ├── Assets/
 │   ├── scene1.unity            # THE app scene (build this one)
+│   ├── Editor/
+│   │   └── OhhoUnifiedAppBuilder.cs  # OmniBot → Rebuild Unified OhhO Screen
 │   ├── Scripts/
 │   │   ├── App/OhhoVrApp.cs    # login→console→garage→teleop routing (singleton)
 │   │   ├── Core/
@@ -291,8 +254,6 @@ vr_app/
 │   │   │   └── ...
 │   │   ├── Video/              # IVideoSource, MJPEG + WebRTC, CameraFeedController
 │   │   └── Recording/          # EpisodeManager, ProfileDrivenRecorder
-│   └── Editor/
-│       └── OhhoUnifiedAppBuilder.cs  # OmniBot → Rebuild Unified OhhO Screen
 ├── Packages/manifest.json
 └── ProjectSettings/ProjectVersion.txt
 ```
@@ -308,7 +269,7 @@ vr_app/
 | Hand mesh offset from real hand | Fixed in this branch — hand skeletons update root pose/scale/bone translations; re-run **OmniBot → Rebuild Unified OhhO Screen** if it regresses |
 | Hand visible in one eye only | Fixed in this branch — hand meshes use `updateWhenOffscreen` so per-eye frustum culling can't drop them |
 | Camera feed shows "No Signal" | Ensure `web_video_server` is running: `ros2 run web_video_server web_video_server` |
-| Export fails | Check VR bridge is running (`ros2 launch omnibot_vr vr_bridge.launch.py`) and firewall allows port 8765 |
+| Export fails | The headset posts to port 8765 ([`TeleopHudController.cs`](Assets/Scripts/UI/TeleopHudController.cs)). This repository has no `omnibot_vr` launch file serving that port. |
 | Arm not moving | Toggle arm enable with left-hand thumbs-up, check `/arm/enable` topic |
 | UI looks low-res | `VRGraphicsBoost` sets 1.5× eye resolution at startup; check it exists on `[OhhO VR App]` |
 | Text renders magenta | TMP font materials were repaired in this branch; if they regress, re-assign `TextMeshPro/Distance Field` to the LiberationSans SDF materials |

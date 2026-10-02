@@ -35,7 +35,7 @@ robot control, 3D visualisation, real-time mapping, and natural-language AI miss
 | Point cloud — pinch to zoom | ✅ | ScaleGestureDetector, min/max zoom clamped |
 | Point cloud — stats overlay | ✅ | Point count, max range, render FPS |
 | **3D Robot Viewer tab** | ✅ | SceneView 4.8.0 (Google Filament), loads `robot.glb` |
-| Robot viewer — GLB model | ✅ | Named nodes match URDF link names; `tools/urdf_to_glb.py` |
+| Robot viewer — GLB model | ✅ | [`RobotViewerFragment.kt`](app/src/main/kotlin/com/varunvaidhiya/robotcontrol/ui/viewer/RobotViewerFragment.kt) loads `robot.glb`. This repository has no `tools/urdf_to_glb.py`. |
 | Robot viewer — live pose | ✅ | Model moves on floor plane from `/odom` |
 | Robot viewer — arm animation | ✅ | Per-joint rotation applied from `/arm/joint_states` |
 | Robot viewer — tap to navigate | ✅ | Ray-cast vs y=0 plane → Nav2 goal published |
@@ -114,28 +114,14 @@ app/src/main/
 │   ├── values-night/colors.xml       # Dark mode color overrides
 │   └── navigation/mobile_navigation.xml
 └── assets/
-    └── robot.glb                     # Generated — see 3D Robot Viewer Setup below (not checked in)
+    └── robot.glb                     # not checked in; no generator script in this repo
 ```
 
 ---
 
 ## 3D Robot Viewer Setup
 
-The **3D Robot** tab loads `robot.glb` from `app/src/main/assets/`. This binary is not
-checked in. Generate it from the URDF + STL meshes (run from the repo root):
-
-```bash
-pip install trimesh[easy] numpy lxml
-python tools/urdf_to_glb.py
-# Output: android_app/app/src/main/assets/robot.glb
-```
-
-Then rebuild the Android app so assets are re-packaged.
-
-The script expands `omnibot.urdf.xacro`, loads all STL meshes, applies joint origin
-transforms, and exports a GLB where every node is named after its URDF link
-(e.g. `arm_shoulder_pan`). The viewer finds nodes by name and applies live joint
-rotations from `/arm/joint_states`.
+The **3D Robot** tab loads `robot.glb` from `omnibot-android/app/src/main/assets/` ([`RobotViewerFragment.kt`](app/src/main/kotlin/com/varunvaidhiya/robotcontrol/ui/viewer/RobotViewerFragment.kt)). That binary is not checked in. This repository does not contain `tools/urdf_to_glb.py` or an `android_app/` directory.
 
 If `robot.glb` is absent the viewer still shows live pose and joint angles as text
 overlays, and displays setup instructions.
@@ -175,25 +161,16 @@ finalises on stop. Status is reported on `/rosbag_recorder/status`.
 
 ### Steps
 
-```bash
-# Open android_app/ in Android Studio, let Gradle sync, then:
-./gradlew build
+Open [`omnibot-android/`](.) in Android Studio and let Gradle sync. From that directory, [`gradlew`](gradlew) is the wrapper (JDK 17, Android SDK):
 
-# Run on device
+```bash
+./gradlew build
 ./gradlew installDebug
 ```
 
 ### Robot-side prerequisites
 
-```bash
-# ROSBridge WebSocket (port 9090)
-./launch_rosbridge.sh
-# or:
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090
-
-# web_video_server for MJPEG (optional but needed for camera feed)
-ros2 run web_video_server web_video_server
-```
+This repository does not contain `launch_rosbridge.sh`. The app's default address is `192.168.1.100` port `9090` in [`Constants.kt`](app/src/main/kotlin/com/varunvaidhiya/robotcontrol/utils/Constants.kt). Camera MJPEG needs `web_video_server` on the robot computer. Neither is started by this Android project.
 
 ---
 
@@ -270,7 +247,7 @@ All topic and service names live in `utils/Constants.kt`.
 - [ ] **Multi-camera switcher** — Swipe between wrist / front / BEV camera on Dashboard.
 - [ ] **Foxglove debug panel** — Embedded Foxglove WebView for raw topic inspection.
 - [ ] **Unit tests for RobotRepository** — Refactor singleton to constructor DI first.
-- [ ] **CI GLB generation** — GitHub Actions step to run `tools/urdf_to_glb.py` and upload `robot.glb` as a release asset.
+- [ ] **CI GLB generation** — `robot.glb` is not checked in, and this repository has no `tools/urdf_to_glb.py`.
 
 ---
 
@@ -280,9 +257,9 @@ All topic and service names live in `utils/Constants.kt`.
 |---------|-----|
 | Gradle sync failed | Check internet; **File > Invalidate Caches > Restart** |
 | Build errors | Ensure JDK 17; **Build > Clean Project** |
-| WebSocket not connecting | Verify same network; check `./launch_rosbridge.sh` is running |
+| WebSocket not connecting | Same network as the robot. Default address is in [`Constants.kt`](app/src/main/kotlin/com/varunvaidhiya/robotcontrol/utils/Constants.kt). This repository has no `launch_rosbridge.sh`. |
 | No camera image | Confirm `web_video_server` is running; check camera URL in Settings |
-| 3D viewer shows banner | Run `python tools/urdf_to_glb.py` then rebuild app |
+| 3D viewer shows banner | `robot.glb` is not checked in. This repository has no `tools/urdf_to_glb.py`. |
 | Robot model doesn't move | Verify `/odom` and `/arm/joint_states` are publishing |
 
 ---

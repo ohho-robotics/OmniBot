@@ -2,7 +2,7 @@
 
 > Status: **All phases implemented (0a–0c + 1–5)** — full multi-robot VR teleop stack: platform contract, app shell, garage sync, glass UI + passthrough, spatial add-robot flow, profile-driven teleop, generalized drive + manipulation, WebRTC video, profile-driven recording, robot-side IK, per-robot calibration, quick-resume, onboarding, tests
 > Target headset: **Meta Quest 3 / 3S** (mixed reality, passthrough)
-> Scope: extend `vr_app/` from a single hardcoded OmniBot controller into a
+> Scope: extend `omnibot-vr/` from a single hardcoded OmniBot controller into a
 > **catalog-driven, any-robot** mixed-reality teleoperation app whose robot list,
 > capability model, branding, **login, product console and saved-robot garage** all
 > mirror the OhhO website — **one shared account, no data re-entry**.
@@ -40,7 +40,7 @@ re-typing IPs, models, or names. The shared substrate:
 - **VR — design system + MR (0c)** — `Shaders/OhhoGlass.shader` (frosted glass
   card), `UI/Theme/{GlassPanel,ThemedText,AccentButton,OhhoFontSet,ThemeApplier}`
   (branding driven from the manifest tokens), `MR/{PassthroughManager,WorldSpaceUiPlacer}`
-  (Quest passthrough + floating panels). Scene/prefab assembly: `vr_app/SCENE_SETUP.md`.
+  (Quest passthrough + floating panels). Scene/prefab assembly: `omnibot-vr/SCENE_SETUP.md`.
 
 Next (Phase 2): wire a selected garage robot's profile into the control layer
 (`IDriveScheme` + hand-IK `IManipulationScheme`) — see §5 and §10. _The VR C# is
@@ -126,9 +126,9 @@ its `DriveKind` and arm DOF. The UI carries the website's visual identity.
 
 Two halves already exist and were designed to meet here:
 
-- **`vr_app/`** already has Unity + Meta XR SDK + ROSBridge + a CCD IK solver +
+- **`omnibot-vr/`** already has Unity + Meta XR SDK + ROSBridge + a CCD IK solver +
   hand tracking + dataset recording — but hardcoded to one robot
-  (`vr_app/Assets/Scripts/Core/RobotConfig.cs`).
+  (`omnibot-vr/Assets/Scripts/Core/RobotConfig.cs`).
 - **`website/lib/garage/`** already has the robot catalog and a **robot-agnostic
   capability model** (`RobotConfig` / `DriveKind`) plus a transport abstraction
   (`RobotTransport`) explicitly built so "a drone, a UR5e arm, a quadruped and
@@ -141,7 +141,7 @@ the website agree on *which robots exist* and *how each one is controlled*.
 
 ## 2. What already exists (starting point)
 
-### 2.1 VR app — `vr_app/` (Unity 2023.3 LTS, Meta XR SDK 60, Quest 3)
+### 2.1 VR app — `omnibot-vr/` (Unity 6000.5.2f1, Meta XR SDK 203.0.0, Quest 3)
 
 | Area | Files | Notes |
 |---|---|---|
@@ -151,12 +151,12 @@ the website agree on *which robots exist* and *how each one is controlled*.
 | Arm IK | `Input/ArmIKSolver.cs` | CCD, pure C#, 20 Hz, 50 iters, 1 mm tol, 6 joints clamped. **SO-101 geometry hardcoded.** |
 | Hand control | `Input/HandTrackingArmController.cs`, `Input/GestureDetector.cs` | Right-hand pose → IK target, pinch → gripper. |
 | UI | `UI/HUDManager.cs`, `UI/{Connection,Telemetry,Control,Recording}Panel.cs`, `UI/CameraFeedViewer.cs` | Floating panels; MJPEG camera feed. |
-| Recording | `Recording/EpisodeManager.cs`, `Recording/DatasetRecorder.cs` | 30 Hz JSONL, export to the `omnibot_vr` ROS bridge. |
+| Recording | `Recording/EpisodeManager.cs`, `Recording/DatasetRecorder.cs` | JSONL on the headset. Export POST lives in `UI/TeleopHudController.cs`. A ROS package named `omnibot_vr` is not in this repository. |
 | Constants | `Core/RobotConfig.cs` | **Single-robot constants — the thing this plan generalizes.** |
 
-Current Unity packages (`vr_app/Packages/manifest.json`): OpenXR 1.10, XR
-Management, Input System, TextMeshPro, uGUI, Newtonsoft JSON, NativeWebSocket,
-Meta XR SDK Core/Interaction/Interaction.OVR 60.
+Current Unity packages ([`omnibot-vr/Packages/manifest.json`](Packages/manifest.json)): OpenXR 1.17.1, XR
+Management 4.5.4, Input System 1.19.0, uGUI 2.5.0, Newtonsoft JSON 3.2.2, NativeWebSocket,
+Meta XR SDK Core/Interaction/Interaction.OVR 203.0.0. Unity is 6000.5.2f1 in [`ProjectSettings/ProjectVersion.txt`](ProjectSettings/ProjectVersion.txt).
 
 ### 2.2 Website — `website/lib/garage/` & `website/lib/connect/`
 
@@ -220,9 +220,9 @@ fallback for offline.
 
 | Concern | Choice | Notes |
 |---|---|---|
-| Engine | Unity 2023.3 LTS + URP | Already pinned. |
+| Engine | Unity 6000.5.2f1 | Pinned in `ProjectSettings/ProjectVersion.txt`. |
 | XR runtime | OpenXR + Meta feature group | Already in manifest. |
-| Meta SDK | Meta XR Core/Interaction SDK 60 | Passthrough + hand tracking. |
+| Meta SDK | Meta XR Core/Interaction SDK 203.0.0 | Pinned in `Packages/manifest.json`. |
 | **Passthrough MR** | `OVRPassthroughLayer` | Always-on background = "see everything through passthrough." |
 | **Scene understanding** | **MRUK** — add `com.meta.xr.mrutilitykit` | Room mesh + spatial anchors → pin the virtual robot workspace to a real surface; world-lock panels. |
 | Hand tracking | Meta Hand Tracking (OVRHand); optionally `com.unity.xr.hands` for OpenXR-portable joints | Wrist pose + pinch. |
@@ -428,7 +428,7 @@ the catalog as an SVG/sprite atlas so VR and web share iconography.
 
 | Phase | Deliverable | Key files |
 |---|---|---|
-| **0a — Platform contract** ✅ | `Product.vr` tag + `OhhO Pilot`; static `vr/manifest.json` (branding + Supabase auth + VR products) + vitest drift check; VR `OhhoTheme`, manifest models, `OhhoPlatform` fetch, `SupabaseAuthService` (email OTP) | `website/lib/vr/*`, `vr_app/.../Core/OhhoTheme.cs`, `Core/Platform/*` |
+| **0a — Platform contract** ✅ | `Product.vr` tag + `OhhO Pilot`; static `vr/manifest.json` (branding + Supabase auth + VR products) + vitest drift check; VR `OhhoTheme`, manifest models, `OhhoPlatform` fetch, `SupabaseAuthService` (email OTP) | `website/lib/vr/*`, `omnibot-vr/.../Core/OhhoTheme.cs`, `Core/Platform/*` |
 | **0b — App shell + garage sync** ✅ | Login panel (Supabase OTP), Console product grid (VR-filtered), Garage panel pulling the user's `user_robots` from Supabase; static `vr/catalog.json` (categories + robot types) + drift check; `OhhoCatalog` id→model resolution; `GarageClient` (PostgREST) | `website/lib/vr/catalog.*`, VR `App/OhhoVrApp`, `UI/Auth/`, `UI/Console/`, `UI/Garage/`, `Core/Platform/{OhhoCatalog,GarageClient,*Models}` |
 | **0c — Glass design system + MR** ✅ | `OhhO/Glass` shader + `OhhoTheme`-driven components (GlassPanel/ThemedText/AccentButton/ThemeApplier + OhhoFontSet), passthrough bootstrap + floating world-space panels; scene-assembly guide | VR `Shaders/OhhoGlass.shader`, `UI/Theme/`, `MR/`, `SCENE_SETUP.md` |
 | **1 — Robot selection (add)** ✅ | spatial "add robot" flow mirroring `RobotSelector` (categories → types → models → name → confirm); `RobotSelectionController` state machine + `CategoryCardView`/`TypeCardView`/`ModelCardView`; writes back to `user_robots` via `GarageClient.AddUserRobot`; wired into garage + fleet panels via Add-Robot button | `UI/Selection/{SelectionState,RobotSelectionController,CategoryCardView,TypeCardView,ModelCardView}.cs`, `UI/Garage/{GaragePanelController,FleetPanelController}.cs` |

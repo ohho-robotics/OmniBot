@@ -32,6 +32,17 @@ jobs:
           python -m unittest discover -s omnibot-ai-engines/agent_engine/tests -t omnibot-ai-engines
           PYTHONPATH=omnibot-ai-engines pytest omnibot-ai-engines/data_engine/tests -q
 
+  docs:
+    name: README docs-as-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: CPU-only README fences in a fresh venv
+        run: python3 scripts/docs_test_readme.py
+
   ros:
     name: colcon build and test
     runs-on: ubuntu-24.04
