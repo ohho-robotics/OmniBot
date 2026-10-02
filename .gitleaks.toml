@@ -1,0 +1,17 @@
+title = "OmniBot"
+
+[extend]
+useDefault = true
+
+# These Meta XR SDK lines match generic-api-key and are not credentials.
+# BlockDataIds.cs is a list of Unity building-block GUIDs.
+# AvatarEntity.cs aliases Oculus.Avatar2.CAPI.
+# VoiceSetupController.cs ships Meta's documented public Wit.ai demo
+# client token (the file says it is a public demo key).
+[[allowlists]]
+description = "Meta XR SDK false positives and the published Wit.ai demo token"
+paths = [
+  '''omnibot-vr/Packages/com\.meta\.xr\.sdk\.core/Editor/BuildingBlocks/BlockDataIds\.cs''',
+  '''omnibot-vr/Packages/com\.meta\.xr\.sdk\.core/Scripts/BuildingBlocks/MultiplayerBlocks/Shared/NetworkedAvatar/Scripts/AvatarEntity\.cs''',
+  '''omnibot-vr/Packages/com\.meta\.xr\.sdk\.core/Scripts/ImmersiveDebugger/DevAgent/Voice/VoiceSetupController\.cs''',
+]
