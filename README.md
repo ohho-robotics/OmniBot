@@ -130,6 +130,33 @@ Open the Android app -> Settings -> enter your robot's IP address (e.g., `192.16
 
 ---
 
+## Gazebo Harmonic simulation
+
+One command starts Gazebo Harmonic, spawns `omnibot_description`, and bridges the base. The default is headless (`gui:=false`), which is what CI runs:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch omnibot_bringup sim.launch.py world:=flat
+```
+
+`world:=apartment` loads a single room with a kitchen (counter, stove, fridge), a desk, and a door. Launch file: [`omnibot-ros2/omnibot_bringup/launch/sim.launch.py`](omnibot-ros2/omnibot_bringup/launch/sim.launch.py). The mecanum chassis is driven in the plane (`drive:=planar` by default; `drive:=mecanum` selects the MecanumDrive plugin). Sensors in this launch are a 2D lidar, the front RGB camera, and the IMU.
+
+`ros_gz_bridge` topics, also the set a later rosbridge client can use (this launch does not start rosbridge):
+
+| Topic | Type |
+|---|---|
+| `/cmd_vel` | `geometry_msgs/msg/Twist` |
+| `/odom` | `nav_msgs/msg/Odometry` |
+| `/scan` | `sensor_msgs/msg/LaserScan` |
+| `/imu` | `sensor_msgs/msg/Imu` |
+| `/camera/front/image_raw` | `sensor_msgs/msg/Image` |
+| `/camera/front/camera_info` | `sensor_msgs/msg/CameraInfo` |
+
+Bridge config: [`omnibot-ros2/omnibot_bringup/config/sim_bridge.yaml`](omnibot-ros2/omnibot_bringup/config/sim_bridge.yaml).
+
+The headless launch test [`omnibot-ros2/omnibot_bringup/test/test_sim_launch.py`](omnibot-ros2/omnibot_bringup/test/test_sim_launch.py) checks that `/odom` and `/scan` publish within 30 s and that `/cmd_vel` moves the robot at least 0.2 m. The `sim-smoke` job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs it on `ros:jazzy`.
+
 ## 🧠 LeRobot Data Collection
 Use `teleop_recorder_node` to record leader-follower demonstrations in [LeRobot HuggingFace dataset format](https://github.com/huggingface/lerobot).
 
