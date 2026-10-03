@@ -62,6 +62,29 @@ python -m data_engine.scripts.ingest_dataset \
 python -m data_engine.scripts.validate_dataset --dataset /data/lerobot/pick_place
 ```
 
+### Quality filter (OHH-99)
+
+Filter out corrupted demonstrations before policy training and output a keep/reject report:
+
+```bash
+python -m data_engine.scripts.filter_episodes \
+    --dataset /data/lerobot/pick_place \
+    --output /data/lerobot/pick_place/meta/filter_results.json
+```
+
+#### Rejection Rules & CLI Thresholds
+
+An episode is rejected if any of the following conditions occur:
+1. **Frozen video**: Identical consecutive frames for >0.5 s (`--max-frozen-s 0.5`).
+2. **Camera timestamp skew**: Wrist vs bird's-eye view camera timestamp delta >50 ms (`--max-camera-skew-s 0.05` or `--max-camera-skew-ms 50.0`).
+3. **Joint step**: Joint position change >0.5 rad between consecutive frames (`--max-joint-step-rad 0.5`).
+4. **Short episode**: Episode duration shorter than 2.0 s (`--min-duration-s 2.0`).
+
+The filter outputs a JSON report with summary statistics, lists of `kept` and `rejected` episode indices, and per-episode metrics and failure reasons. In synthetic tests or environments without video codecs, `FrameSource` abstracts frame access and loads `.npy` arrays directly.
+
+> **Demonstration Count Rule (OHH-49)**:
+> OHH-49 ("Collect 50–100 demonstrations of one manipulation task") demonstration counts must **only** include episodes that this quality filter keeps (`status == "keep"`, listed in `kept`). Flawed episodes (frozen camera, timestamp skew, long pauses, or joint jumps) must be discarded and excluded from demonstration counts and policy training sets.
+
 ### Visualise an episode
 ```bash
 python -m data_engine.visualization.visualize_episode \
