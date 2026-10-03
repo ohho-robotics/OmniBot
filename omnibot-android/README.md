@@ -199,9 +199,9 @@ All topic and service names live in `utils/Constants.kt`.
 | Topic | Type | Notes |
 |-------|------|-------|
 | `/cmd_vel/teleop` | Twist | 20 Hz, clamped ±1.5 m/s / ±2.0 rad/s. Routed by `cmd_vel_mux`; set `/control_mode` to `"teleop"` first |
-| `/control_mode` | String | `"nav2"` / `"vla"` / `"teleop"` / `"rl_nav"` — drives `cmd_vel_mux` |
+| `/control_mode` | String | `"nav2"` / `"vla"` / `"teleop"` / `"rl_nav"` — drives `cmd_vel_mux` and the arm mux. `mobile_manipulation` bring-up starts in `"teleop"` |
 | `/robot_mode` | String | monitoring only; does not control the mux |
-| `/arm/joint_commands` | JointState | joint names must be `arm_*` prefixed |
+| `/arm/joint_commands` | JointState | joint names must be `arm_*` prefixed. Held by `arm_cmd_mux` until `/control_mode` is `"vla"`, `"nav2"`, or `"rl_nav"` (same topic as the policy) |
 | `/arm/enable` | Bool | |
 | `/mission/command` | String | structured (`navigate:X,vla:Y`) or natural language |
 | `/ai/command` | String | natural language → LangGraph agent (requires `omnibot_orchestration`) |

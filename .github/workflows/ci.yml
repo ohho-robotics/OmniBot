@@ -27,7 +27,7 @@ jobs:
         run: ruff check .
       - name: CPU suites
         run: |
-          pytest mecanum-kinematics/tests yahboom-python-driver/tests ros2-bev-stitcher/tests omnibot-ros2/omnibot_arm/test omnibot-ros2/omnibot_bringup/test/test_unbuilt_launch.py -q
+          pytest mecanum-kinematics/tests yahboom-python-driver/tests ros2-bev-stitcher/tests omnibot-ros2/omnibot_arm/test omnibot-ros2/omnibot_bringup/test/test_unbuilt_launch.py omnibot-ros2/omnibot_bringup/test/test_teleop_default.py -q
           python -m unittest discover -s omnibot-ai-engines/learning_engine/tests -t omnibot-ai-engines
           python -m unittest discover -s omnibot-ai-engines/agent_engine/tests -t omnibot-ai-engines
           PYTHONPATH=omnibot-ai-engines pytest omnibot-ai-engines/data_engine/tests -q

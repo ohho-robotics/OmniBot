@@ -26,11 +26,13 @@ Usage
   ros2 topic pub /rl_nav/goal geometry_msgs/msg/PoseStamped \\
     "{header: {frame_id: 'map'}, pose: {position: {x: 1.5, y: 0.0}}}"
 
-  # Test RL arm only:
+  # Test RL arm only (control mode must leave teleop or the mux holds it):
+  ros2 topic pub /control_mode std_msgs/msg/String "data: 'rl_nav'"
   ros2 topic pub /arm/cmd_mode std_msgs/msg/String "data: 'rl_arm'"
 
-  # Return to SmolVLA arm control:
-  ros2 topic pub /arm/cmd_mode std_msgs/msg/String "data: 'smolvla'"
+  # Return to policy arm control (still requires an autonomous control mode):
+  ros2 topic pub /control_mode std_msgs/msg/String "data: 'vla'"
+  ros2 topic pub /arm/cmd_mode std_msgs/msg/String "data: 'policy'"
 """
 
 import os
@@ -84,7 +86,8 @@ def generate_launch_description():
     # ── Arm Command Mux ───────────────────────────────────────────────────────
     # Subscribes: /arm/joint_commands (SmolVLA), /arm/joint_commands/rl, /arm/cmd_mode
     # Publishes:  /arm/joint_commands/out  → arm_driver_node
-    # Default mode: "smolvla" — transparent pass-through, no behaviour change.
+    # Starts held. Arm commands forward only after /control_mode is
+    # vla, nav2, or rl_nav, and /emergency_stop is false.
     # Skip with include_arm_mux:=false when a parent launch already starts it.
     arm_cmd_mux_node = Node(
         package="omnibot_rl",
