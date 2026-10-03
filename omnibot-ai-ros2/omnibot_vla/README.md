@@ -13,6 +13,9 @@ Vision-Language-Action control of the OmniBot base.
 
 The node publishes to `/cmd_vel/vla` (not `/cmd_vel` directly) so the
 `cmd_vel_mux` in `omnibot_hybrid` can select it when `control_mode == "vla"`.
+The mux starts in `teleop`, so `/cmd_vel/vla` is not forwarded until a human
+sets `/control_mode`. That gate was unit-tested without a robot; it has not
+been launched with this node on hardware.
 Inference runs on a 1 Hz timer. The OpenVLA 7-DOF action is mapped to a base
 `Twist`: `action[0] → linear.x`, `action[1] → linear.y`, `action[5] → angular.z`
 (`unnorm_key="bridge_orig"`).

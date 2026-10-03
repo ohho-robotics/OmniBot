@@ -50,14 +50,15 @@ def generate_launch_description():
 
     # ------------------------------------------------------------------
     # 2. cmd_vel Mux — selects among nav2 / vla / teleop / rl_nav sources.
-    #    In mobile manipulation mode default is "vla" so SmolVLA drives the base.
+    #    Bring-up starts in teleop. Nav2, VLA, and RL base commands are not
+    #    forwarded until a human sets /control_mode. /cmd_vel/teleop still works.
     # ------------------------------------------------------------------
     cmd_vel_mux_node = Node(
         package="omnibot_hybrid",
         executable="cmd_vel_mux",
         name="cmd_vel_mux",
         output="screen",
-        parameters=[{"default_mode": "vla"}],
+        parameters=[{"default_mode": "teleop"}],
     )
 
     # ------------------------------------------------------------------
@@ -95,15 +96,16 @@ def generate_launch_description():
     # ------------------------------------------------------------------
     # 6. Arm Command Mux — bridges /arm/joint_commands (SmolVLA / Android)
     #    and /arm/joint_commands/rl → /arm/joint_commands/out → arm_driver.
-    #    Default mode "smolvla" is transparent: SmolVLA commands pass straight
-    #    through without the RL nodes being needed.
+    #    default_mode teleop holds both arm sources until /control_mode is
+    #    vla, nav2, or rl_nav. The yaml file still names the arm source used
+    #    after that switch; this dict overrides its startup mode.
     # ------------------------------------------------------------------
     arm_cmd_mux_node = Node(
         package="omnibot_rl",
         executable="arm_cmd_mux",
         name="arm_cmd_mux",
         output="screen",
-        parameters=[rl_arm_params],
+        parameters=[rl_arm_params, {"default_mode": "teleop"}],
     )
 
     # ------------------------------------------------------------------

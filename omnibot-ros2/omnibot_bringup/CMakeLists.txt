@@ -20,6 +20,12 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_teleop_default
+    test/test_teleop_default.py
+    TIMEOUT 60
+  )
+
   # Headless Gazebo launch test. The sim-smoke CI job exports
   # OMNIBOT_SIM_SMOKE=1 before configure. The default colcon test job
   # does not, so it does not start Gazebo.
