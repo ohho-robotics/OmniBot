@@ -409,11 +409,39 @@ class ArmDriverNode(Node):
         except Exception as exc:
             self.get_logger().warn(f"Torque write error: {exc}")
 
+    def _read_present_positions_on_enable(self):
+        """Read measured joint positions from bus on torque-on.
+
+        Returns list of radians on success, or None if bus is connected but read fails.
+        In simulation (follower_bus is None), returns sim_positions.
+        """
+        if self.follower_bus is not None:
+            try:
+                ticks_dict = self.follower_bus.read("Present_Position")
+                ticks = [int(ticks_dict[name]) for name in self.joint_names]
+                rads = self.ticks_to_radians(ticks)
+                return [float(r) for r in rads]
+            except Exception as exc:
+                self.get_logger().warn(
+                    f"Follower read error on torque-on: {exc}"
+                )
+                return None
+        return list(self.sim_positions)
+
     def enable_cb(self, msg: Bool):
         """Enable or disable torque. Ignored while /emergency_stop is true."""
         action = self._safety.on_arm_enable(bool(msg.data))
         self._log_action(action)
         self._write_torque_enable(action.value)
+        if action.value == 1:
+            measured = self._read_present_positions_on_enable()
+            if measured is not None:
+                self._safety.seed_target(measured, time.monotonic())
+                self._write_joint_targets(measured)
+            else:
+                self.get_logger().warn(
+                    "Cannot read present position on torque-on; initial goal not written."
+                )
 
     def emergency_stop_cb(self, msg: Bool):
         """Drop follower torque. Clearing the stop does not turn it back on."""

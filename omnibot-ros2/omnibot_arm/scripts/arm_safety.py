@@ -97,6 +97,20 @@ class ArmSafety:
         self.last_command_time = None
         self._holding = False
 
+    def drop_target(self):
+        """Drop the stored target and timestamp so nothing is held while limp."""
+        self.last_command = None
+        self.last_command_time = None
+        self._holding = False
+
+    def seed_target(self, positions, now):
+        """Re-seed target and clamp reference from measured joint positions."""
+        clamped = clamp_radians(positions, self.joint_min, self.joint_max)
+        self.last_command = list(clamped)
+        self.last_command_time = float(now) if now is not None else None
+        self._holding = False
+        return self.last_command
+
     def on_emergency_stop(self, active):
         """Disable torque while active. Clearing the stop leaves torque off."""
         active = bool(active)
@@ -104,7 +118,7 @@ class ArmSafety:
             rising = not self.emergency_stop
             self.emergency_stop = True
             self.torque_enabled = False
-            self._holding = False
+            self.drop_target()
             message = None
             if rising:
                 message = (
@@ -114,7 +128,7 @@ class ArmSafety:
         if self.emergency_stop:
             self.emergency_stop = False
             self.torque_enabled = False
-            self._holding = False
+            self.drop_target()
             return TorqueAction(
                 0,
                 "Emergency stop cleared — follower torque stays off until "
@@ -128,7 +142,7 @@ class ArmSafety:
         enable = bool(enable)
         if self.emergency_stop:
             self.torque_enabled = False
-            self._holding = False
+            self.drop_target()
             if enable:
                 return TorqueAction(
                     0,
@@ -141,7 +155,7 @@ class ArmSafety:
             self.torque_enabled = True
             return TorqueAction(1, "Arm torque enabled", "info")
         self.torque_enabled = False
-        self._holding = False
+        self.drop_target()
         return TorqueAction(0, "Arm torque disabled", "info")
 
     def accept_command(self, commanded, now, reference):

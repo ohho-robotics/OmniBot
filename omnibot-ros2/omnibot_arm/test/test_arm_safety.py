@@ -322,17 +322,29 @@ class TestTimeoutHold:
         assert safety.hold_if_stale(1.049).rewrite is False
         assert safety.hold_if_stale(1.05).rewrite is True
 
-    def test_estop_suppresses_hold_until_torque_returns(self):
+    def test_stale_goal_snap_regression_torque_off_drops_target(self):
         safety = _safety()
         safety.accept_command(ZEROS, 0.0, ZEROS)
+        assert safety.last_command is not None
+
+        # Torque off drops target and timestamp
         safety.on_emergency_stop(True)
-        assert safety.hold_if_stale(1.0).rewrite is False
+        assert safety.last_command is None
+        assert safety.last_command_time is None
+
+        # Re-enabling torque without new command does not hold stale pre-drop target
         safety.on_emergency_stop(False)
         safety.on_arm_enable(True)
         hold = safety.hold_if_stale(1.0)
-        assert hold.rewrite is True
-        assert hold.positions == pytest.approx(ZEROS)
-        assert "holding last command" in hold.message
+        assert hold.rewrite is False
+        assert hold.positions is None
+
+        # Disabling torque via arm_enable(False) also drops target
+        safety.accept_command(ZEROS, 1.1, ZEROS)
+        assert safety.last_command is not None
+        safety.on_arm_enable(False)
+        assert safety.last_command is None
+        assert safety.last_command_time is None
 
 
 # ---------------------------------------------------------------------------
@@ -386,11 +398,12 @@ class TestEmergencyStopTorque:
         safety = _safety()
         safety.accept_command(ZEROS, 0.0, ZEROS)
         safety.on_emergency_stop(True)
+        assert safety.last_command is None
         rejected = safety.accept_command(
             [1.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.1, ZEROS
         )
         assert rejected.write is False
-        assert safety.last_command == pytest.approx(ZEROS)
+        assert safety.last_command is None
         safety.on_emergency_stop(False)
         safety.on_arm_enable(True)
         stepped = safety.accept_command(
@@ -443,7 +456,8 @@ class TestDriverWiring:
         assert all(value == 0 for value in values.values())
 
         node.enable_cb(_bool(True))
-        register, values = bus.write.call_args[0]
+        torque_call = [c for c in bus.write.call_args_list if c[0][0] == "Torque_Enable"][-1]
+        register, values = torque_call[0]
         assert register == "Torque_Enable"
         assert values == {name: 1 for name in node.joint_names}
         assert node.torque_enabled is True
@@ -499,3 +513,52 @@ class TestDriverWiring:
         node.emergency_stop_cb(_bool(True))
         node.joint_command_cb(_joints(node, [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
         assert node.sim_positions == pytest.approx([0.0] * 6)
+
+    def test_torque_on_reseeds_from_measured_pose(self):
+        node = _driver()
+        bus = MagicMock()
+        node.follower_bus = bus
+
+        # Measured positions from bus indicate arm sagged while limp
+        sagged_ticks = [2048 + 512, 2048 - 512, 2048 + 256, 2048, 2048, 2048]
+        sagged_rads = node.ticks_to_radians(sagged_ticks)
+        bus.read.return_value = dict(zip(node.joint_names, sagged_ticks))
+
+        # Re-enable torque
+        node.enable_cb(_bool(True))
+
+        # Writes Torque_Enable 1 then Goal_Position equals measured pose
+        assert bus.write.call_count == 2
+        call1, call2 = bus.write.call_args_list
+        assert call1[0][0] == "Torque_Enable"
+        assert call1[0][1] == {name: 1 for name in node.joint_names}
+        assert call2[0][0] == "Goal_Position"
+        assert call2[0][1] == dict(zip(node.joint_names, sagged_ticks))
+        assert node._safety.last_command == pytest.approx(sagged_rads)
+
+        # Next joint command steps from sagged pose, not 0.0 or pre-drop target
+        target = list(sagged_rads)
+        target[0] += 1.0  # Big jump
+        bus.write.reset_mock()
+        node.joint_command_cb(_joints(node, target))
+        assert bus.write.call_count == 1
+        goal_call = bus.write.call_args[0]
+        assert goal_call[0] == "Goal_Position"
+        # Only stepped by 0.15 rad from sagged_rads[0] (allowing tick quantization)
+        written_ticks = [goal_call[1][name] for name in node.joint_names]
+        written_rads = node.ticks_to_radians(written_ticks)
+        assert written_rads[0] == pytest.approx(sagged_rads[0] + 0.15, abs=0.005)
+
+    def test_torque_on_read_failure_skips_goal_and_logs(self):
+        node = _driver()
+        bus = MagicMock()
+        bus.read.side_effect = RuntimeError("Bus read error")
+        node.follower_bus = bus
+
+        node.enable_cb(_bool(True))
+
+        # Wrote Torque_Enable but skipped Goal_Position
+        assert bus.write.call_count == 1
+        assert bus.write.call_args[0][0] == "Torque_Enable"
+        assert node._safety.last_command is None
+        assert any("Cannot read present position" in msg for msg in node.get_logger().warnings)
