@@ -18,8 +18,8 @@ class ROSBagParser:
                 Example:
                 {
                     'cameras': {
-                        'front': '/camera/front/image_raw/compressed',
-                        'wrist': '/camera/wrist/image_raw/compressed'
+                        'wrist': '/camera/wrist/image_raw/compressed',
+                        'bev': '/camera/base/bev/image_raw/compressed'
                     },
                     'state': '/robot/odom',
                     'cmd_vel': '/cmd_vel'
@@ -166,8 +166,8 @@ class ROSBagParser:
         Returns:
             {
                 'cameras': {
-                    'front': [(timestamp, image), ...],
-                    'wrist': [(timestamp, image), ...]
+                    'wrist': [(timestamp, image), ...],
+                    'bev': [(timestamp, image), ...]
                 },
                 'states': [(timestamp, state_array), ...],
                 'actions': [(timestamp, action_array), ...]

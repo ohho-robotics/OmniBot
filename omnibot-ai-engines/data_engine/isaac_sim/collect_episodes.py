@@ -102,6 +102,7 @@ _BAG_TOPICS = [
     "/arm/joint_states",
     "/camera/image_raw",
     "/camera/wrist/image_raw",
+    "/camera/base/bev/image_raw",
     "/camera/front/image_raw",
     "/camera/rear/image_raw",
     "/camera/left/image_raw",

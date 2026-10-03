@@ -19,14 +19,17 @@ dataset/
       episode_000000.parquet   ← state, action, timestamps (one row per frame)
   videos/
     chunk-000/
-      observation.images.front/episode_000000.mp4
       observation.images.wrist/episode_000000.mp4
+      observation.images.bev/episode_000000.mp4
 ```
 
 State and action are the unified **9-D** mobile-manipulation spec (6 arm joints
 + 3 base velocities), defined in `schema/constants.py`
 (`MOBILE_MANIP_STATE_SPEC` / `MOBILE_MANIP_ACTION_SPEC`). Camera streams written
-to the dataset are `observation.images.front` and `observation.images.wrist`.
+to the dataset are `observation.images.wrist` and `observation.images.bev`
+(wrist close-up and the stitched bird's-eye view). Those two keys are defined
+once in `schema/camera_keys.py`. The physical front camera feeds the BEV
+stitcher and is not a dataset feature.
 
 ## Setup
 
