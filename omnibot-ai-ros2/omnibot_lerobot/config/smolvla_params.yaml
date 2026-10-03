@@ -10,6 +10,8 @@ smolvla_node:
     image_height: 240
     task_description: "pick up the object and place it in the bin"
     base_vel_scale: 0.3
+    # Max joint-target change per accepted command (same 0.15 rad limit as arm driver)
+    max_joint_delta_rad: 0.15
     # TensorRT acceleration (Phase 1 — vision encoder only)
     # Set use_trt: true and point trt_engine_path at the pre-built engine.
     # Build the engine once with:

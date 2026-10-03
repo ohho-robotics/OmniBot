@@ -52,6 +52,19 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import String, Bool
 
 try:
+    from omnibot_lerobot.policy_guard import (
+        MAX_JOINT_DELTA_RAD,
+        PolicyGuard,
+        is_black_frame,
+    )
+except ImportError:
+    from policy_guard import (
+        MAX_JOINT_DELTA_RAD,
+        PolicyGuard,
+        is_black_frame,
+    )
+
+try:
     from cv_bridge import CvBridge
 
     CV_BRIDGE_AVAILABLE = True
@@ -143,6 +156,8 @@ class PolicyNode(Node):
         self.declare_parameter("use_trt", False)
         self.declare_parameter("trt_engine_path", "")
         self.declare_parameter("use_depth", False)
+        # Max joint-target change per cycle (same 0.15 rad limit as arm driver)
+        self.declare_parameter("max_joint_delta_rad", MAX_JOINT_DELTA_RAD)
 
         model_type = self.get_parameter("model_type").value
         checkpoint = self.get_parameter("checkpoint_path").value
@@ -158,6 +173,12 @@ class PolicyNode(Node):
         self.use_trt = self.get_parameter("use_trt").value
         self.trt_engine_path = self.get_parameter("trt_engine_path").value
         self.use_depth = self.get_parameter("use_depth").value
+        self.max_joint_delta_rad = float(
+            self.get_parameter("max_joint_delta_rad").value
+        )
+        self.policy_period = (
+            1.0 / self.policy_hz if self.policy_hz > 0 else 0.10
+        )
 
         # Timing accumulators
         self._t_preprocess = collections.deque(maxlen=100)
@@ -175,7 +196,9 @@ class PolicyNode(Node):
             self.bridge = CvBridge()
         else:
             self.bridge = None
-            self.get_logger().warn("cv_bridge not available — images will be zero.")
+            self.get_logger().warn(
+                "cv_bridge not available — camera images will be missing."
+            )
 
         # Device
         if TORCH_AVAILABLE:
@@ -190,6 +213,14 @@ class PolicyNode(Node):
 
         # Load policy
         self.adapter = self._load_adapter(model_type, checkpoint, device_str)
+
+        # Safety guard for camera frame validation, inference latency, and arm clamping
+        self.guard = PolicyGuard(
+            policy_period=self.policy_period,
+            max_joint_delta_rad=self.max_joint_delta_rad,
+            required_keys=self.adapter.image_keys,
+            base_vel_scale=self.base_vel_scale,
+        )
 
         # Publishers
         self.joint_cmd_pub = self.create_publisher(
@@ -296,7 +327,7 @@ class PolicyNode(Node):
     # Image preprocessing
     # ------------------------------------------------------------------
 
-    def _ros_image_to_numpy(self, msg: Image) -> np.ndarray:
+    def _ros_image_to_numpy(self, msg: Image) -> np.ndarray | None:
         if self.bridge is not None:
             try:
                 return np.array(
@@ -307,7 +338,7 @@ class PolicyNode(Node):
                 self.get_logger().warn(
                     f"cv_bridge error: {exc}", throttle_duration_sec=5.0
                 )
-        return np.zeros((self.image_height, self.image_width, 3), dtype=np.uint8)
+        return None
 
     def _numpy_to_tensor(self, img_np: np.ndarray):
         w, h = self.adapter.image_size
@@ -357,12 +388,16 @@ class PolicyNode(Node):
         self.get_logger().info(f'Task: "{self.task_description}"')
         if hasattr(self.adapter, "reset"):
             self.adapter.reset()
+        if hasattr(self, "guard"):
+            self.guard.reset()
 
     def _enable_cb(self, msg: Bool) -> None:
         self.enabled = msg.data
         self.get_logger().info(f"Policy {'ENABLED' if msg.data else 'DISABLED'}.")
         if msg.data:
             self.adapter.reset()
+            if hasattr(self, "guard"):
+                self.guard.reset()
 
     # ------------------------------------------------------------------
     # Inference loop
@@ -375,10 +410,12 @@ class PolicyNode(Node):
         with self._cam_lock:
             camera_snapshot = dict(self.camera_images)
 
-        missing = [k for k in self.adapter.image_keys if camera_snapshot.get(k) is None]
-        if missing:
+        required_keys = self.adapter.image_keys
+        valid, invalid = self.guard.check_images(camera_snapshot, required_keys)
+        if not valid:
             self.get_logger().warn(
-                f"Waiting for images: {missing}", throttle_duration_sec=2.0
+                f"Waiting for valid images (missing or black: {invalid})",
+                throttle_duration_sec=2.0,
             )
             return
 
@@ -386,12 +423,8 @@ class PolicyNode(Node):
 
         try:
             obs = {}
-            for key in self.adapter.image_keys:
+            for key in required_keys:
                 img = camera_snapshot[key]
-                if img is None:
-                    img = np.zeros(
-                        (self.image_height, self.image_width, 3), dtype=np.uint8
-                    )
                 obs[key] = self._numpy_to_tensor(img)
 
             state = np.concatenate([self.arm_positions, self.base_vel])
@@ -406,11 +439,12 @@ class PolicyNode(Node):
             if self.adapter.task_key:
                 obs[self.adapter.task_key] = self.task_description
 
-            t1 = time.perf_counter() if self._diag_enabled else None
+            t1 = time.perf_counter()
 
             action = self.adapter.select_action(obs)
 
-            t2 = time.perf_counter() if self._diag_enabled else None
+            t2 = time.perf_counter()
+            inference_dur = t2 - t1
 
             if self._diag_enabled and t0 is not None:
 
@@ -421,8 +455,20 @@ class PolicyNode(Node):
                 self._t_inference.append(ms(t1, t2))
                 self._t_total.append(ms(t0, t2))
 
-            self._publish_arm(action[:6])
-            self._publish_base(action[6:9])
+            if self.guard.is_latency_exceeded(inference_dur, self.policy_period):
+                self.get_logger().warn(
+                    f"Inference latency ({inference_dur * 1000.0:.1f}ms) exceeded "
+                    f"policy period ({self.policy_period * 1000.0:.1f}ms) — action dropped.",
+                    throttle_duration_sec=1.0,
+                )
+                return
+
+            action_arr = np.asarray(action, dtype=np.float32).ravel()
+            clamped_arm = self.guard.process_arm_action(
+                action_arr[:6], reference=self.arm_positions
+            )
+            self._publish_arm(clamped_arm)
+            self._publish_base(action_arr[6:9])
 
         except Exception as exc:
             self.get_logger().error(
@@ -433,7 +479,7 @@ class PolicyNode(Node):
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.name = ARM_JOINT_NAMES
-        msg.position = arm_action.tolist()
+        msg.position = [float(x) for x in arm_action]
         self.joint_cmd_pub.publish(msg)
 
     def _publish_base(self, base_action: np.ndarray) -> None:
