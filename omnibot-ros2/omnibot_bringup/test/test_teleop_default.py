@@ -140,6 +140,42 @@ def test_repeated_teleop_does_not_zero_again():
     assert base.take_base_stop() is False
 
 
+ALL_MODE_TRANSITIONS = [
+    (m1, m2)
+    for m1 in ("nav2", "vla", "teleop", "rl_nav")
+    for m2 in ("nav2", "vla", "teleop", "rl_nav")
+    if m1 != m2
+]
+
+
+@pytest.mark.parametrize("from_mode,to_mode", ALL_MODE_TRANSITIONS)
+def test_stream_gate_stops_base_on_every_transition_pair(from_mode, to_mode):
+    gate = StreamGate(from_mode)
+    assert gate.mode == from_mode
+    assert gate.take_base_stop() is False
+
+    assert gate.set_mode(to_mode) is True
+    assert gate.mode == to_mode
+    assert gate.take_base_stop() is True
+    assert gate.take_base_stop() is False
+
+
+@pytest.mark.parametrize("mode", ("nav2", "vla", "teleop", "rl_nav"))
+def test_stream_gate_repeated_mode_does_not_zero_again(mode):
+    gate = StreamGate(mode)
+    assert gate.set_mode(mode) is True
+    assert gate.take_base_stop() is False
+
+
+@pytest.mark.parametrize("mode", ("nav2", "vla", "teleop", "rl_nav"))
+@pytest.mark.parametrize("invalid", ("unknown", "invalid", "", "   ", None))
+def test_stream_gate_unknown_mode_ignored_and_does_not_zero(mode, invalid):
+    gate = StreamGate(mode)
+    assert gate.set_mode(invalid) is False
+    assert gate.mode == mode
+    assert gate.take_base_stop() is False
+
+
 def _run_stubbed(script):
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(
@@ -374,5 +410,124 @@ def test_arm_cmd_mux_wrapper_without_ros():
         node._rl_arm_cb(cmd)
         node._policy_cb(cmd)
         assert node._out_pub.msgs == []
+        """
+    )
+
+
+def test_cmd_vel_mux_mode_switch_zeros_output_without_ros():
+    _run_stubbed(
+        """
+        import sys
+        from types import ModuleType, SimpleNamespace
+
+        def _pkg(name):
+            module = ModuleType(name)
+            sys.modules[name] = module
+            return module
+
+        rclpy = _pkg("rclpy")
+        rclpy.init = lambda *a, **k: None
+        rclpy.shutdown = lambda *a, **k: None
+        rclpy.spin = lambda *a, **k: None
+        node_mod = _pkg("rclpy.node")
+
+        class Pub:
+            def __init__(self):
+                self.msgs = []
+            def publish(self, msg):
+                self.msgs.append(msg)
+
+        class Node:
+            def __init__(self, name):
+                self._params = {}
+            def declare_parameter(self, name, default):
+                self._params[name] = default
+            def get_parameter(self, name):
+                return SimpleNamespace(value=self._params[name])
+            def create_subscription(self, *a, **k):
+                return None
+            def create_publisher(self, *a, **k):
+                return Pub()
+            def create_timer(self, *a, **k):
+                return None
+            def get_logger(self):
+                return SimpleNamespace(
+                    info=lambda *a, **k: None,
+                    warn=lambda *a, **k: None,
+                )
+            def destroy_node(self):
+                return None
+
+        node_mod.Node = Node
+        geom = _pkg("geometry_msgs")
+        geom_msg = _pkg("geometry_msgs.msg")
+        geom.msg = geom_msg
+
+        class Twist:
+            def __init__(self):
+                self.linear = SimpleNamespace(x=0.0, y=0.0, z=0.0)
+                self.angular = SimpleNamespace(x=0.0, y=0.0, z=0.0)
+
+        geom_msg.Twist = Twist
+        std = _pkg("std_msgs")
+        std_msg = _pkg("std_msgs.msg")
+        std.msg = std_msg
+
+        class StringMsg:
+            def __init__(self):
+                self.data = ""
+
+        std_msg.String = StringMsg
+        std_msg.Bool = SimpleNamespace
+
+        from omnibot_hybrid.cmd_vel_mux import CmdVelMux
+
+        node = CmdVelMux()
+        modes = ["teleop", "vla", "nav2", "rl_nav"]
+
+        # 1. Every transition pair (m1 -> m2) publishes exactly one zero Twist
+        for m1 in modes:
+            for m2 in modes:
+                if m1 == m2:
+                    continue
+                node._gate.mode = m1
+                node._gate._base_stop = False
+                node._out_pub.msgs.clear()
+
+                msg = StringMsg()
+                msg.data = m2
+                node._mode_cb(msg)
+
+                assert len(node._out_pub.msgs) == 1, (
+                    f"Expected 1 msg on {m1} -> {m2}, got {len(node._out_pub.msgs)}"
+                )
+                zero = node._out_pub.msgs[0]
+                assert zero.linear.x == 0.0
+                assert zero.linear.y == 0.0
+                assert zero.angular.z == 0.0
+
+        # 2. Repeated same mode must NOT publish zero Twist
+        for m in modes:
+            node._gate.mode = m
+            node._gate._base_stop = False
+            node._out_pub.msgs.clear()
+
+            msg = StringMsg()
+            msg.data = m
+            node._mode_cb(msg)
+
+            assert len(node._out_pub.msgs) == 0, (
+                f"Repeated mode {m} should not publish zero"
+            )
+
+        # 3. Unknown mode must NOT publish zero Twist and must not change mode
+        node._gate.mode = "teleop"
+        node._gate._base_stop = False
+        node._out_pub.msgs.clear()
+        bad = StringMsg()
+        bad.data = "nonexistent"
+        node._mode_cb(bad)
+        assert len(node._out_pub.msgs) == 0
+        assert node._active_mode == "teleop"
         """
     )
