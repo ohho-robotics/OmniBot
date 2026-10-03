@@ -754,6 +754,43 @@ def test_filter_episodes_cli_missing_camera_timestamps_flag(tmp_path: Path):
     assert "Rejected episodes: 1" in proc_reject.stdout
 
 
+def test_filter_dataset_missing_parquet_not_counted_as_unchecked_skew(tmp_path: Path):
+    """Missing-parquet episodes must not be counted in unchecked skew summary."""
+    root = tmp_path / "mixed_missing_parquet"
+    _write_dataset_without_per_camera_timestamps(root, n_episodes=2)
+
+    # Delete episode 0 parquet to simulate missing parquet file
+    ep0_parquet = root / "data" / "chunk-000" / "episode_000000.parquet"
+    assert ep0_parquet.exists()
+    ep0_parquet.unlink()
+
+    # 1. Unchecked (default): 1 kept (ep 1), 1 rejected (ep 0), unchecked count is exactly 1
+    res = filter_dataset(root)
+    assert res.summary["total_episodes"] == 2
+    assert res.summary["kept_episodes"] == 1
+    assert res.summary["rejected_episodes"] == 1
+    assert res.summary["camera_skew: unchecked (no per-camera timestamps)"] == 1
+    assert 0 in res.rejected
+    assert 1 in res.kept
+    assert "missing_parquet" in res.episodes[0].reasons[0]
+    assert res.episodes[0].camera_skew is None
+    assert not res.episodes[0].camera_skew_unchecked
+    assert res.episodes[1].camera_skew == "camera_skew: unchecked (no per-camera timestamps)"
+    assert res.episodes[1].camera_skew_unchecked
+
+    # 2. Reject mode: 0 kept, 2 rejected, but unchecked count is still exactly 1
+    res_reject = filter_dataset(
+        root, thresholds=FilterThresholds(missing_camera_timestamps="reject")
+    )
+    assert res_reject.summary["total_episodes"] == 2
+    assert res_reject.summary["kept_episodes"] == 0
+    assert res_reject.summary["rejected_episodes"] == 2
+    assert res_reject.summary["camera_skew: unchecked (no per-camera timestamps)"] == 1
+    assert "missing_parquet" in res_reject.episodes[0].reasons[0]
+    assert "camera_skew: unchecked (no per-camera timestamps)" in res_reject.episodes[1].reasons
+
+
+
 # ---------------------------------------------------------------------------
 # Regression tests: Finding B — Joint jump angular wrap
 # ---------------------------------------------------------------------------

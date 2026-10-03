@@ -26,6 +26,8 @@ from data_engine.schema.camera_keys import (
 )
 from data_engine.schema.constants import ARM_JOINT_NAMES
 
+CAMERA_SKEW_UNCHECKED = "camera_skew: unchecked (no per-camera timestamps)"
+
 # ---------------------------------------------------------------------------
 # Thresholds and Result Dataclasses
 # ---------------------------------------------------------------------------
@@ -77,6 +79,11 @@ class EpisodeScore:
     metrics: EpisodeMetrics
     camera_skew: str | None = None
     warnings: list[str] = field(default_factory=list)
+
+    @property
+    def camera_skew_unchecked(self) -> bool:
+        """Whether camera skew was unchecked due to missing per-camera timestamps."""
+        return self.camera_skew == CAMERA_SKEW_UNCHECKED
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -423,7 +430,7 @@ def check_camera_skew(
 
     if not has_timestamps:
         if missing_mode == "reject":
-            return None, True, "camera_skew: unchecked (no per-camera timestamps)"
+            return None, True, CAMERA_SKEW_UNCHECKED
         return None, False, None
 
     if np.median(t_w) > 1e12 or np.max(t_w) > 1e12:
@@ -576,9 +583,9 @@ def score_episode(
         reasons.append(skew_reason)
 
     if max_camera_skew_s is None:
-        camera_skew_desc = "camera_skew: unchecked (no per-camera timestamps)"
+        camera_skew_desc = CAMERA_SKEW_UNCHECKED
         if not skew_rej:
-            warnings.append("camera_skew: unchecked (no per-camera timestamps)")
+            warnings.append(CAMERA_SKEW_UNCHECKED)
     else:
         camera_skew_desc = f"{max_camera_skew_s:.4f}s"
 
@@ -795,14 +802,14 @@ def filter_dataset(
 
     total = len(ep_indices)
     unchecked_skew_count = sum(
-        1 for ep in episode_scores.values() if ep.metrics.max_camera_skew_s is None
+        1 for ep in episode_scores.values() if ep.camera_skew == CAMERA_SKEW_UNCHECKED
     )
     summary = {
         "total_episodes": total,
         "kept_episodes": len(kept),
         "rejected_episodes": len(rejected),
         "keep_ratio": round(len(kept) / total, 4) if total > 0 else 0.0,
-        "camera_skew: unchecked (no per-camera timestamps)": unchecked_skew_count,
+        CAMERA_SKEW_UNCHECKED: unchecked_skew_count,
     }
 
     return DatasetFilterResult(
