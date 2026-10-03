@@ -128,7 +128,7 @@ Eight frames from `/camera/front/image_raw` saved by that test (`OMNIBOT_SIM_FRA
 
 ## Teleop from the website
 
-[OHH-89](https://linear.app/ohho-robotics/issue/OHH-89) is the website issue for Connect. Start the flat Gazebo world, then open Connect and set the ROSBridge URL to `ws://localhost:9090`. The launch does not exit, so the docs-test job skips this fence.
+[OHH-89](https://linear.app/ohho-robotics/issue/OHH-89) is the website issue for Connect. Start the flat Gazebo world, then open Connect and set the ROSBridge URL to `ws://localhost:9090`. rosbridge listens on localhost only by default; `rosbridge_address:=0.0.0.0` exposes it on the network without authentication. The launch does not exit, so the docs-test job skips this fence.
 
 <!-- docs-test: skip ros -->
 ```bash
