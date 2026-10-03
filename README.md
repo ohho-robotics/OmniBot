@@ -72,7 +72,7 @@ colcon test-result --verbose
 |---|---|---|
 | `ohho sim --robot omnibot` | Neither | [ohho-os 1.1.2](https://pypi.org/project/ohho-os/1.1.2/) and the docs-test job in [ci.yml](.github/workflows/ci.yml) |
 | Colcon build and test of `src/` | Neither | [src/](src/) and the `ros` job in [ci.yml](.github/workflows/ci.yml). That job needs ROS 2 Jazzy. |
-| Kinematics, Yahboom codec, BEV homography, arm tick math, learning engine, agent engine | Neither | The `cpu` job in [ci.yml](.github/workflows/ci.yml) |
+| Kinematics, Yahboom codec, BEV homography, arm tick math, arm command safety (joint limits, 0.15 rad/cycle, 200 ms hold, e-stop torque latch), learning engine, agent engine | Neither | The `cpu` job in [ci.yml](.github/workflows/ci.yml) runs `pytest omnibot-ros2/omnibot_arm/test`. Those tests do not start ROS or the arm. |
 | Xbox teleop, cameras, arm, LeRobot recording | Robot | [robot_with_joy.launch.py](omnibot-ros2/omnibot_bringup/launch/robot_with_joy.launch.py), [perception.launch.py](omnibot-ros2/omnibot_bringup/launch/perception.launch.py), [arm.launch.py](omnibot-ros2/omnibot_arm/launch/arm.launch.py), [teleop_record.launch.py](omnibot-ai-ros2/omnibot_lerobot/launch/teleop_record.launch.py) |
 | Nav2 and SLAM | Robot | [omnibot_navigation](omnibot-ros2/omnibot_navigation/) |
 | Gazebo compose files | Neither | [docker-compose.yml](omnibot-digital-twin/docker/docker-compose.yml) runs headless Gazebo. [docker-compose.gpu.yml](omnibot-digital-twin/docker/docker-compose.gpu.yml) is an optional NVIDIA overlay. The docs-test job does not start compose. |
@@ -81,6 +81,12 @@ colcon test-result --verbose
 | Isaac Lab RL | GPU | [rl_engine/README.md](omnibot-ai-engines/rl_engine/README.md) and [requirements.txt](omnibot-ai-engines/rl_engine/requirements.txt) (`isaaclab`, `onnxruntime-gpu`) |
 | Android controller | Robot | [omnibot-android/](omnibot-android/). Building it needs the Android SDK and JDK 17 ([`build.gradle.kts`](omnibot-android/build.gradle.kts)), which is separate from a desktop GPU. |
 | Quest teleop | Robot | [omnibot-vr/](omnibot-vr/). Unity **6000.5.2f1** is pinned in [`ProjectSettings/ProjectVersion.txt`](omnibot-vr/ProjectSettings/ProjectVersion.txt). |
+
+## Arm command safety
+
+`arm_driver_node` drops follower torque when `/emergency_stop` is true (`Torque_Enable` 0) and leaves it off when the stop clears, until a later `/arm/enable` true arrives while the stop is false. An enable message received during the stop does not re-enable torque. If `/arm/joint_commands/out` is silent for `command_timeout_sec` (0.2 s) the driver holds the last accepted joint command and logs that once. Each accepted target is clamped to `joint_min` / `joint_max` and to `max_joint_delta_rad` per cycle. The shared default is `MAX_JOINT_DELTA_RAD` (0.15 rad) in [`omnibot-ros2/omnibot_arm/scripts/arm_safety.py`](omnibot-ros2/omnibot_arm/scripts/arm_safety.py). OHH-100 should reuse that constant. The Yahboom base controller already zeros velocity on `/emergency_stop`; this change does not modify that node.
+
+The decisions above are unit-tested without ROS and without the arm (`pytest omnibot-ros2/omnibot_arm/test`). Feetech bus writes, `ros2 launch`, and the base controller were not run for this behavior. Position servos only; there is no force control. `policy_node` is unchanged.
 
 The launch files below target the physical robot. Docs-test skips them.
 

@@ -30,6 +30,10 @@ Usage
 
 When mode is "policy" (default), this node is a transparent pass-through —
 the active visuomotor policy and the Android app work without any changes.
+
+This mux does not clamp, hold, or drop torque. arm_driver_node applies
+those checks on /arm/joint_commands/out (emergency stop, 200 ms silence
+hold, joint limits, and MAX_JOINT_DELTA_RAD per cycle).
 """
 
 import rclpy
