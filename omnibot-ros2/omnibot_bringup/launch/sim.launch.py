@@ -12,8 +12,11 @@ lidar, the front RGB camera, and the IMU. ros_gz_bridge bridges:
     /cmd_vel  /odom  /scan  /imu  /camera/front/image_raw
     /camera/front/camera_info  /clock
 
-That topic set is what a later rosbridge client needs (OHH-92). This launch
-does not start rosbridge_server, foxglove, or the arm driver.
+`rosbridge:=true` (the default) also starts rosbridge_websocket on port 9090
+bound to 127.0.0.1 so a browser on this machine can drive this stack.
+`rosbridge_address:=0.0.0.0` exposes it on the network without authentication.
+The sim-smoke test passes `rosbridge:=false` and does not start rosbridge.
+This launch does not start foxglove or the arm driver.
 
 `drive:=mecanum` selects the gz-sim MecanumDrive plugin instead of planar move.
 `gui:=true` opens the Gazebo client; the default is server-only so CI has no display.
@@ -130,7 +133,24 @@ def _launch_sim(context, *args, **kwargs):
         parameters=[{"config_file": bridge_config, "use_sim_time": False}],
     )
 
-    return [gazebo, robot_state_publisher, spawn, bridge]
+    actions = [gazebo, robot_state_publisher, spawn, bridge]
+    rosbridge_on = LaunchConfiguration("rosbridge").perform(context).lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if rosbridge_on:
+        address = LaunchConfiguration("rosbridge_address").perform(context)
+        actions.append(
+            Node(
+                package="rosbridge_server",
+                executable="rosbridge_websocket",
+                name="rosbridge_websocket",
+                output="screen",
+                parameters=[{"port": 9090, "address": address}],
+            )
+        )
+    return actions
 
 
 def generate_launch_description():
@@ -150,6 +170,24 @@ def generate_launch_description():
                 "gui",
                 default_value="false",
                 description="Open the Gazebo GUI. Default is headless.",
+            ),
+            DeclareLaunchArgument(
+                "rosbridge",
+                default_value="true",
+                description=(
+                    "Start rosbridge_websocket on port 9090, bound to "
+                    "rosbridge_address (127.0.0.1 by default). "
+                    "The sim-smoke test sets this false."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "rosbridge_address",
+                default_value="127.0.0.1",
+                description=(
+                    "Interface rosbridge_websocket binds. "
+                    "127.0.0.1 is loopback only. "
+                    "0.0.0.0 exposes it on the network without authentication."
+                ),
             ),
             OpaqueFunction(function=_launch_sim),
         ]
