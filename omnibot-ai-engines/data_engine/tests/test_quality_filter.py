@@ -201,8 +201,8 @@ def test_frozen_camera_rule_rejects_identical_frames_over_half_second():
 def test_frozen_camera_rule_keeps_dynamic_video():
     fps = 30.0
     n = 60
-    # Every frame has a different pixel value
-    frames = [np.full((4, 4, 3), i % 256, dtype=np.uint8) for i in range(n)]
+    # Every frame has genuine motion exceeding noise threshold
+    frames = [np.full((4, 4, 3), (i * 10) % 256, dtype=np.uint8) for i in range(n)]
     timestamps = np.arange(n) / fps
 
     max_frozen, rejected, reason = check_frozen_frames(
@@ -231,6 +231,67 @@ def test_frozen_camera_threshold_boundary():
     dur, rej, _ = check_frozen_frames(frames_long, ts_long, fps=fps, max_frozen_s=0.5)
     assert rej is True
     assert dur > 0.5
+
+
+def test_frozen_frames_codec_noise_rejected():
+    """Sequence of nearly identical frames with small codec noise (+/-1-2 levels) > 0.5 s is rejected."""
+    fps = 30.0
+    # 20 frames = 19 intervals * (1/30) = 0.633 s > 0.5 s
+    n = 20
+    rng = np.random.default_rng(seed=42)
+    base = np.full((16, 16, 3), 128, dtype=np.int16)
+    frames = []
+    for _ in range(n):
+        # Noise within [-2, 2] levels simulating lossy video compression artifacts
+        noise = rng.integers(-2, 3, size=(16, 16, 3))
+        frames.append(np.clip(base + noise, 0, 255).astype(np.uint8))
+
+    timestamps = np.arange(n) / fps
+    dur, rej, reason = check_frozen_frames(
+        frames=frames,
+        timestamps=timestamps,
+        fps=fps,
+        max_frozen_s=0.5,
+    )
+    assert rej is True
+    assert dur > 0.5
+    assert reason is not None
+    assert "frozen_video" in reason
+
+    # With exact equality (frame_diff_threshold=0.0), codec noise causes false negative
+    dur_exact, rej_exact, _ = check_frozen_frames(
+        frames=frames,
+        timestamps=timestamps,
+        fps=fps,
+        max_frozen_s=0.5,
+        frame_diff_threshold=0.0,
+    )
+    assert rej_exact is False
+    assert dur_exact == 0.0
+
+
+def test_frozen_frames_genuine_motion_not_rejected():
+    """Sequence with genuine motion (shifting pattern) is NOT rejected."""
+    fps = 30.0
+    n = 30
+    frames = []
+    # Genuine motion: shifting high-contrast block across frames
+    for i in range(n):
+        frame = np.zeros((16, 16, 3), dtype=np.uint8)
+        pos = (i * 2) % 12
+        frame[4:12, pos : pos + 4, :] = 200
+        frames.append(frame)
+
+    timestamps = np.arange(n) / fps
+    dur, rej, reason = check_frozen_frames(
+        frames=frames,
+        timestamps=timestamps,
+        fps=fps,
+        max_frozen_s=0.5,
+    )
+    assert rej is False
+    assert dur == 0.0
+    assert reason is None
 
 
 # ---------------------------------------------------------------------------
@@ -369,12 +430,12 @@ def _write_synthetic_dataset_with_cases(root: Path) -> dict[str, int]:
         bev_frames = np.zeros((n, 8, 8, 3), dtype=np.uint8)
 
         for i in range(n):
-            bev_frames[i] = (i * 3) % 256
+            bev_frames[i] = (i * 10) % 256
             if name == "frozen_video" and 20 <= i <= 45:
                 # 26 identical frames (25/30 = 0.83 s > 0.5 s)
                 wrist_frames[i] = wrist_frames[20]
             else:
-                wrist_frames[i] = (i * 2) % 256
+                wrist_frames[i] = (i * 10) % 256
 
         for cam_key, frames_arr in [
             (OBSERVATION_IMAGE_WRIST, wrist_frames),
@@ -668,8 +729,8 @@ def _write_dataset_without_per_camera_timestamps(root: Path, n_episodes: int = 2
         wrist_frames = np.zeros((n, 8, 8, 3), dtype=np.uint8)
         bev_frames = np.zeros((n, 8, 8, 3), dtype=np.uint8)
         for i in range(n):
-            wrist_frames[i] = (i * 2 + 1) % 256
-            bev_frames[i] = (i * 3 + 1) % 256
+            wrist_frames[i] = (i * 10 + 1) % 256
+            bev_frames[i] = (i * 10 + 1) % 256
 
         for cam_key, frames_arr in [
             (OBSERVATION_IMAGE_WRIST, wrist_frames),
@@ -788,6 +849,104 @@ def test_filter_dataset_missing_parquet_not_counted_as_unchecked_skew(tmp_path: 
     assert res_reject.summary["camera_skew: unchecked (no per-camera timestamps)"] == 1
     assert "missing_parquet" in res_reject.episodes[0].reasons[0]
     assert "camera_skew: unchecked (no per-camera timestamps)" in res_reject.episodes[1].reasons
+
+
+def test_filter_episodes_cli_frame_diff_threshold_override(tmp_path: Path):
+    """CLI flag --frame-diff-threshold overrides the default tolerance."""
+    root = tmp_path / "cli_frame_diff_override"
+    meta = root / "meta"
+    meta.mkdir(parents=True, exist_ok=True)
+    fps = 30
+    n = 90  # 3.0 s (> 2.0 s min duration)
+
+    rng = np.random.default_rng(seed=123)
+    base = np.full((16, 16, 3), 128, dtype=np.int16)
+    # Frames with small codec noise in [-2, 2] -> MAD is ~1.6
+    wrist_frames = np.zeros((n, 16, 16, 3), dtype=np.uint8)
+    bev_frames = np.zeros((n, 16, 16, 3), dtype=np.uint8)
+    for i in range(n):
+        noise = rng.integers(-2, 3, size=(16, 16, 3))
+        wrist_frames[i] = np.clip(base + noise, 0, 255).astype(np.uint8)
+        bev_frames[i] = (i * 10) % 256
+
+    episodes_meta = [{"episode_index": 0, "tasks": [0], "length": n}]
+    t = np.arange(n, dtype=np.float64) / fps
+    states = np.zeros((n, 9), dtype=np.float32)
+    for j in range(6):
+        states[:, j] = np.linspace(0.0, 0.4, n)
+
+    table = pa.table(
+        {
+            "observation.state": [states[i].tolist() for i in range(n)],
+            "action": [[0.0] * 9 for _ in range(n)],
+            "timestamp": t.tolist(),
+            "observation.images.wrist.timestamp": t.tolist(),
+            "observation.images.bev.timestamp": t.tolist(),
+            "frame_index": list(range(n)),
+            "episode_index": [0] * n,
+            "index": list(range(n)),
+            "task_index": [0] * n,
+            "next.done": [i == n - 1 for i in range(n)],
+        }
+    )
+    chunk = "chunk-000"
+    data_dir = root / "data" / chunk
+    data_dir.mkdir(parents=True, exist_ok=True)
+    pq.write_table(table, data_dir / "episode_000000.parquet")
+
+    for cam_key, frames_arr in [
+        (OBSERVATION_IMAGE_WRIST, wrist_frames),
+        (OBSERVATION_IMAGE_BEV, bev_frames),
+    ]:
+        cam_dir = root / "videos" / chunk / cam_key
+        cam_dir.mkdir(parents=True, exist_ok=True)
+        np.save(cam_dir / "episode_000000.npy", frames_arr)
+        (cam_dir / "episode_000000.mp4").write_bytes(b"dummy")
+
+    (meta / "info.json").write_text(json.dumps({"fps": fps, "total_episodes": 1}, indent=2))
+    (meta / "episodes.jsonl").write_text(json.dumps(episodes_meta[0]) + "\n")
+
+    env = os.environ.copy()
+    prev = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(ENGINES) + (os.pathsep + prev if prev else "")
+
+    # 1. Default CLI: default frame_diff_threshold (2.0) catches the noisy frozen frames -> REJECTED
+    out_default = tmp_path / "out_default.json"
+    cmd_default = [
+        sys.executable,
+        "-m",
+        "data_engine.scripts.filter_episodes",
+        "--dataset",
+        str(root),
+        "--output",
+        str(out_default),
+    ]
+    proc_default = subprocess.run(
+        cmd_default, cwd=str(ENGINES), env=env, capture_output=True, text=True, check=False
+    )
+    assert proc_default.returncode == 0
+    assert "Rejected episodes: 1" in proc_default.stdout
+    assert "frozen_video" in proc_default.stdout
+
+    # 2. Override CLI: --frame-diff-threshold 0.5 is stricter than noise MAD (~1.6) -> KEPT
+    out_override = tmp_path / "out_override.json"
+    cmd_override = [
+        sys.executable,
+        "-m",
+        "data_engine.scripts.filter_episodes",
+        "--dataset",
+        str(root),
+        "--output",
+        str(out_override),
+        "--frame-diff-threshold",
+        "0.5",
+    ]
+    proc_override = subprocess.run(
+        cmd_override, cwd=str(ENGINES), env=env, capture_output=True, text=True, check=False
+    )
+    assert proc_override.returncode == 0
+    assert "Kept episodes:     1" in proc_override.stdout
+    assert "Rejected episodes: 0" in proc_override.stdout
 
 
 

@@ -44,6 +44,13 @@ from data_engine.quality.episode_filter import FilterThresholds, filter_dataset
     help="Max duration (s) of identical frames before rejection",
 )
 @click.option(
+    "--frame-diff-threshold",
+    default=2.0,
+    show_default=True,
+    type=float,
+    help="Mean absolute pixel difference (0-255 scale) below which frames are treated as identical (default: 2.0)",
+)
+@click.option(
     "--max-camera-skew-s",
     default=None,
     type=float,
@@ -93,6 +100,7 @@ def main(
     dataset: Path,
     output: Path | None,
     max_frozen_s: float,
+    frame_diff_threshold: float,
     max_camera_skew_s: float | None,
     max_camera_skew_ms: float | None,
     max_joint_step_rad: float,
@@ -120,6 +128,7 @@ def main(
     click.echo(f"Scoring dataset episodes: {dataset.resolve()}")
     click.echo(
         f"Thresholds: max_frozen={max_frozen_s:.2f}s, "
+        f"frame_diff_threshold={frame_diff_threshold:.2f}, "
         f"max_camera_skew={resolved_skew_s * 1000.0:.1f}ms, "
         f"max_joint_step={max_joint_step_rad:.2f}rad, "
         f"min_duration={min_duration_s:.2f}s, "
@@ -132,6 +141,7 @@ def main(
 
     thresholds = FilterThresholds(
         max_frozen_s=max_frozen_s,
+        frame_diff_threshold=frame_diff_threshold,
         max_camera_skew_s=resolved_skew_s,
         max_joint_step_rad=max_joint_step_rad,
         min_duration_s=min_duration_s,

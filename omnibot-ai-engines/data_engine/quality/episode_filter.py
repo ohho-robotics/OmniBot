@@ -41,7 +41,11 @@ class FilterThresholds:
     max_camera_skew_s: float = 0.05
     max_joint_step_rad: float = 0.5
     min_duration_s: float = 2.0
-    frame_diff_threshold: float = 0.0
+    # Mean absolute pixel difference (MAD) on a 0-255 scale below which frames are
+    # considered identical. Lossy .mp4 codecs introduce quantization noise (+/-1-2
+    # levels, MAD ~0.5-1.8) on static scenes; a default tolerance of 2.0 catches
+    # stuck cameras after decode while genuine physical motion produces MAD >> 2.0.
+    frame_diff_threshold: float = 2.0
     missing_camera_timestamps: str = "unchecked"  # "unchecked" or "reject"
     continuous_joints: set[str] = field(default_factory=lambda: {"wrist_roll"})
 
@@ -458,17 +462,24 @@ def check_frozen_frames(
     timestamps: Sequence[float] | np.ndarray | None = None,
     fps: float = 30.0,
     max_frozen_s: float = 0.5,
-    frame_diff_threshold: float = 0.0,
+    frame_diff_threshold: float = 2.0,
     cam_key: str = "camera",
 ) -> tuple[float, bool, str | None]:
     """Check if camera stream has identical consecutive frames for longer than max_frozen_s.
 
     Args:
-        frames: Iterable yielding 2D/3D numpy arrays.
+        frames: Iterable yielding 2D/3D numpy arrays (uint8 pixel values on a 0-255 scale).
         timestamps: Optional per-frame timestamps.
         fps: Frame rate if timestamps are omitted.
         max_frozen_s: Max allowable frozen duration in seconds (default: 0.5 s).
-        frame_diff_threshold: Mean absolute pixel difference to consider identical (default: 0.0).
+        frame_diff_threshold: Mean absolute pixel difference (MAD) on a 0-255 scale
+            to consider consecutive frames identical/frozen (default: 2.0).
+            H.264/lossy compression noise on static scenes typically causes small
+            quantization jitter of +/-1-2 intensity levels per pixel (MAD ~0.5-1.8).
+            A threshold of 2.0 treats these compression artifacts as identical frames,
+            preventing stuck cameras in lossy .mp4 files from bypassing the filter,
+            while genuine physical motion produces macro-level visual changes (MAD >> 2.0).
+            Pass 0.0 for exact byte-for-byte pixel equality.
         cam_key: Camera name for reporting.
 
     Returns:
