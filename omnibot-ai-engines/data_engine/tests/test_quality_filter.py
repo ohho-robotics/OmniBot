@@ -574,3 +574,267 @@ def test_ohh_49_demo_count_only_uses_kept_episodes(tmp_path: Path):
     ohh_49_demonstration_count = len(result.kept)
     assert ohh_49_demonstration_count == 1
     assert ohh_49_demonstration_count != result.summary["total_episodes"]
+
+
+# ---------------------------------------------------------------------------
+# Regression tests: Finding A — Missing camera timestamps handling
+# ---------------------------------------------------------------------------
+
+
+def test_camera_skew_missing_timestamps_unchecked():
+    """Missing timestamps in unchecked mode must return max_skew=None and not reject."""
+    max_skew, rejected, reason = check_camera_skew(None, None, missing_mode="unchecked")
+    assert max_skew is None
+    assert rejected is False
+    assert reason is None
+
+    # Empty array timestamps
+    max_skew_empty, rejected_empty, _ = check_camera_skew([], [], missing_mode="unchecked")
+    assert max_skew_empty is None
+    assert rejected_empty is False
+
+    # In score_episode, episode is kept, skew metric is None, and camera_skew warning recorded
+    score = score_episode(
+        episode_index=10,
+        states=np.zeros((60, 9), dtype=np.float32),
+        timestamps=np.linspace(0, 2.0, 60),
+        wrist_timestamps=None,
+        bev_timestamps=None,
+        thresholds=FilterThresholds(missing_camera_timestamps="unchecked"),
+    )
+    assert score.passed is True
+    assert score.status == "keep"
+    assert score.metrics.max_camera_skew_s is None
+    assert score.camera_skew == "camera_skew: unchecked (no per-camera timestamps)"
+    assert "camera_skew: unchecked (no per-camera timestamps)" in score.warnings
+    assert score.to_dict()["camera_skew"] == "camera_skew: unchecked (no per-camera timestamps)"
+    assert score.to_dict()["metrics"]["max_camera_skew_s"] is None
+
+
+def test_camera_skew_missing_timestamps_reject():
+    """Missing timestamps in reject mode must reject episode with specific reason."""
+    max_skew, rejected, reason = check_camera_skew(None, None, missing_mode="reject")
+    assert max_skew is None
+    assert rejected is True
+    assert reason == "camera_skew: unchecked (no per-camera timestamps)"
+
+    score = score_episode(
+        episode_index=11,
+        states=np.zeros((60, 9), dtype=np.float32),
+        timestamps=np.linspace(0, 2.0, 60),
+        wrist_timestamps=None,
+        bev_timestamps=None,
+        thresholds=FilterThresholds(missing_camera_timestamps="reject"),
+    )
+    assert score.passed is False
+    assert score.status == "reject"
+    assert "camera_skew: unchecked (no per-camera timestamps)" in score.reasons
+    assert score.metrics.max_camera_skew_s is None
+
+
+def _write_dataset_without_per_camera_timestamps(root: Path, n_episodes: int = 2) -> None:
+    """Write synthetic dataset with only single shared 'timestamp' column."""
+    meta = root / "meta"
+    meta.mkdir(parents=True, exist_ok=True)
+    fps = 30
+    episodes_meta = []
+    n = 90  # 3.0 s > 2.0 s threshold
+
+    for ep_idx in range(n_episodes):
+        episodes_meta.append({"episode_index": ep_idx, "tasks": [0], "length": n})
+        t = np.arange(n, dtype=np.float64) / fps
+        states = np.zeros((n, 9), dtype=np.float32)
+        for j in range(6):
+            states[:, j] = np.linspace(0.0, 0.4, n)
+
+        # Only standard LeRobot columns: observation.state, action, timestamp
+        table = pa.table(
+            {
+                "observation.state": [states[i].tolist() for i in range(n)],
+                "action": [[0.0] * 9 for _ in range(n)],
+                "timestamp": t.tolist(),
+                "frame_index": list(range(n)),
+                "episode_index": [ep_idx] * n,
+                "index": list(range(n)),
+                "task_index": [0] * n,
+                "next.done": [i == n - 1 for i in range(n)],
+            }
+        )
+        chunk = f"chunk-{ep_idx // 1000:03d}"
+        data_dir = root / "data" / chunk
+        data_dir.mkdir(parents=True, exist_ok=True)
+        pq.write_table(table, data_dir / f"episode_{ep_idx:06d}.parquet")
+
+        wrist_frames = np.zeros((n, 8, 8, 3), dtype=np.uint8)
+        bev_frames = np.zeros((n, 8, 8, 3), dtype=np.uint8)
+        for i in range(n):
+            wrist_frames[i] = (i * 2 + 1) % 256
+            bev_frames[i] = (i * 3 + 1) % 256
+
+        for cam_key, frames_arr in [
+            (OBSERVATION_IMAGE_WRIST, wrist_frames),
+            (OBSERVATION_IMAGE_BEV, bev_frames),
+        ]:
+            cam_dir = root / "videos" / chunk / cam_key
+            cam_dir.mkdir(parents=True, exist_ok=True)
+            np.save(cam_dir / f"episode_{ep_idx:06d}.npy", frames_arr)
+            (cam_dir / f"episode_{ep_idx:06d}.mp4").write_bytes(b"dummy")
+
+    (meta / "info.json").write_text(json.dumps({"fps": fps, "total_episodes": n_episodes}, indent=2))
+    (meta / "episodes.jsonl").write_text("\n".join(json.dumps(e) for e in episodes_meta) + "\n")
+
+
+def test_filter_dataset_missing_camera_timestamps_unchecked_and_reject(tmp_path: Path):
+    root = tmp_path / "missing_ts_dataset"
+    _write_dataset_without_per_camera_timestamps(root, n_episodes=2)
+
+    # 1. Unchecked (default): kept, max_camera_skew_s is None, summary reports unchecked count
+    res_unchecked = filter_dataset(root)
+    assert res_unchecked.summary["total_episodes"] == 2
+    assert res_unchecked.summary["kept_episodes"] == 2
+    assert res_unchecked.summary["camera_skew: unchecked (no per-camera timestamps)"] == 2
+    assert res_unchecked.episodes[0].metrics.max_camera_skew_s is None
+    assert res_unchecked.episodes[0].camera_skew == "camera_skew: unchecked (no per-camera timestamps)"
+
+    # 2. Reject: rejected with reason
+    res_reject = filter_dataset(
+        root, thresholds=FilterThresholds(missing_camera_timestamps="reject")
+    )
+    assert res_reject.summary["total_episodes"] == 2
+    assert res_reject.summary["kept_episodes"] == 0
+    assert res_reject.summary["rejected_episodes"] == 2
+    assert res_reject.summary["camera_skew: unchecked (no per-camera timestamps)"] == 2
+    assert "camera_skew: unchecked (no per-camera timestamps)" in res_reject.episodes[0].reasons
+
+
+def test_filter_episodes_cli_missing_camera_timestamps_flag(tmp_path: Path):
+    root = tmp_path / "cli_missing_ts"
+    _write_dataset_without_per_camera_timestamps(root, n_episodes=1)
+    out_json = tmp_path / "cli_missing_out.json"
+
+    env = os.environ.copy()
+    prev = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(ENGINES) + (os.pathsep + prev if prev else "")
+
+    # Default unchecked
+    cmd_default = [
+        sys.executable,
+        "-m",
+        "data_engine.scripts.filter_episodes",
+        "--dataset",
+        str(root),
+        "--output",
+        str(out_json),
+    ]
+    proc_default = subprocess.run(
+        cmd_default, cwd=str(ENGINES), env=env, capture_output=True, text=True, check=False
+    )
+    assert proc_default.returncode == 0
+    assert "camera_skew: unchecked (no per-camera timestamps)" in proc_default.stdout
+    assert "Kept episodes:     1" in proc_default.stdout
+
+    # Reject flag
+    out_reject = tmp_path / "cli_reject_out.json"
+    cmd_reject = [
+        sys.executable,
+        "-m",
+        "data_engine.scripts.filter_episodes",
+        "--dataset",
+        str(root),
+        "--output",
+        str(out_reject),
+        "--missing-camera-timestamps",
+        "reject",
+    ]
+    proc_reject = subprocess.run(
+        cmd_reject, cwd=str(ENGINES), env=env, capture_output=True, text=True, check=False
+    )
+    assert proc_reject.returncode == 0
+    assert "[REJECT] camera_skew: unchecked (no per-camera timestamps)" in proc_reject.stdout
+    assert "Rejected episodes: 1" in proc_reject.stdout
+
+
+# ---------------------------------------------------------------------------
+# Regression tests: Finding B — Joint jump angular wrap
+# ---------------------------------------------------------------------------
+
+
+def test_joint_jump_wrist_roll_continuous_wrap_passes():
+    """Continuous wrist_roll joint crossing +/-pi wrap must use shortest distance and pass."""
+    states = np.zeros((2, 6), dtype=np.float32)
+    # wrist_roll is joint 4 in ARM_JOINT_NAMES.
+    # Transition: 3.10 rad -> -3.10 rad. Raw step: 6.20 rad. Shortest angular distance: ~0.083 rad.
+    states[0, 4] = 3.10
+    states[1, 4] = -3.10
+
+    max_step, rejected, reason = check_joint_jump(states, max_joint_step_rad=0.5)
+    assert rejected is False
+    assert max_step == pytest.approx(0.083185, abs=1e-3)
+    assert reason is None
+
+
+def test_joint_jump_limited_joint_raw_difference_fails():
+    """Limited joints like shoulder_pan must NOT wrap; a jump must keep raw step and be rejected."""
+    states = np.zeros((2, 6), dtype=np.float32)
+    # shoulder_pan is joint 0 in ARM_JOINT_NAMES.
+    # Transition: 3.10 rad -> -3.10 rad.
+    states[0, 0] = 3.10
+    states[1, 0] = -3.10
+
+    max_step, rejected, reason = check_joint_jump(states, max_joint_step_rad=0.5)
+    assert rejected is True
+    assert max_step == pytest.approx(6.20, abs=1e-3)
+    assert reason is not None
+    assert "joint_jump" in reason
+    assert "shoulder_pan" in reason
+
+
+def test_joint_jump_configurable_continuous_joints():
+    """Continuous joints set must be configurable."""
+    states = np.zeros((2, 6), dtype=np.float32)
+    states[0, 0] = 3.10
+    states[1, 0] = -3.10
+
+    # shoulder_pan configured as continuous -> wraps and passes
+    max_step, rejected, reason = check_joint_jump(
+        states,
+        max_joint_step_rad=0.5,
+        continuous_joints={"shoulder_pan", "wrist_roll"},
+    )
+    assert rejected is False
+    assert max_step == pytest.approx(0.083185, abs=1e-3)
+    assert reason is None
+
+    # wrist_roll with empty continuous_joints set -> treated as limited and rejected
+    wrist_states = np.zeros((2, 6), dtype=np.float32)
+    wrist_states[0, 4] = 3.10
+    wrist_states[1, 4] = -3.10
+    max_step_w, rejected_w, reason_w = check_joint_jump(
+        wrist_states,
+        max_joint_step_rad=0.5,
+        continuous_joints=set(),
+    )
+    assert rejected_w is True
+    assert max_step_w == pytest.approx(6.20, abs=1e-3)
+    assert "wrist_roll" in reason_w
+
+
+def test_joint_jump_continuous_joint_true_jump_rejected():
+    """Even for continuous joints, an angular step exceeding threshold must be rejected."""
+    states = np.zeros((2, 6), dtype=np.float32)
+    # Step from 0.0 to 0.6 rad (> 0.5 rad) on wrist_roll
+    states[0, 4] = 0.0
+    states[1, 4] = 0.6
+
+    max_step, rejected, reason = check_joint_jump(states, max_joint_step_rad=0.5)
+    assert rejected is True
+    assert max_step == pytest.approx(0.60, abs=1e-3)
+    assert "wrist_roll" in reason
+
+    # Step crossing wrap but true delta > 0.5 rad (2.5 rad -> -2.5 rad => delta 1.283 rad)
+    states[0, 4] = 2.5
+    states[1, 4] = -2.5
+    max_step2, rejected2, reason2 = check_joint_jump(states, max_joint_step_rad=0.5)
+    assert rejected2 is True
+    assert max_step2 == pytest.approx(1.283185, abs=1e-3)
+    assert "wrist_roll" in reason2
