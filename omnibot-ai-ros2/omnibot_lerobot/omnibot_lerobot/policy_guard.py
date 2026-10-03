@@ -178,6 +178,7 @@ class TickResult:
     dropped_reason: str | None = None
     inference_duration: float | None = None
     preprocess_duration: float | None = None
+    publish_zero_base: bool = False
 
 
 class PolicyGuard:
@@ -296,6 +297,9 @@ class PolicyGuard:
             warning = f"Waiting for valid images (missing or black: {invalid})"
             return TickResult(
                 should_publish=False,
+                publish_zero_base=True,
+                base_command=np.zeros(3, dtype=np.float32),
+                arm_command=None,
                 warning=warning,
                 dropped_reason="missing_or_black_images",
             )
@@ -330,6 +334,9 @@ class PolicyGuard:
             )
             return TickResult(
                 should_publish=False,
+                publish_zero_base=True,
+                base_command=np.zeros(3, dtype=np.float32),
+                arm_command=None,
                 warning=warning,
                 dropped_reason="stale_inference",
                 inference_duration=inference_dur,
@@ -345,6 +352,7 @@ class PolicyGuard:
 
         return TickResult(
             should_publish=True,
+            publish_zero_base=False,
             arm_command=clamped_arm,
             base_command=clamped_base,
             inference_duration=inference_dur,

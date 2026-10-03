@@ -357,6 +357,54 @@ class TestTickDecisionWithFakeAdapter:
         # Action was dropped: last_arm_cmd must NOT be updated
         assert guard.last_arm_cmd is None
 
+    def test_skipped_tick_publishes_zero_base_decision(self):
+        guard = PolicyGuard(policy_period=0.10, max_joint_delta_rad=0.15)
+        adapter = FakePolicyAdapter()
+        # Black frame
+        res_black = guard.tick(
+            camera_images={
+                "observation.images.wrist": _make_black_image(),
+                "observation.images.bev": _make_valid_image(),
+            },
+            adapter=adapter,
+            arm_positions=np.zeros(6),
+        )
+        assert res_black.should_publish is False
+        assert res_black.publish_zero_base is True
+        assert res_black.arm_command is None
+        assert np.allclose(res_black.base_command, [0.0, 0.0, 0.0])
+
+        # Missing frame
+        res_missing = guard.tick(
+            camera_images={
+                "observation.images.wrist": _make_valid_image(),
+                "observation.images.bev": None,
+            },
+            adapter=adapter,
+            arm_positions=np.zeros(6),
+        )
+        assert res_missing.should_publish is False
+        assert res_missing.publish_zero_base is True
+        assert res_missing.arm_command is None
+        assert np.allclose(res_missing.base_command, [0.0, 0.0, 0.0])
+
+        # Latency exceeded
+        clock_ticks = [0.0, 0.001, 0.001, 0.150]
+        t_iter = iter(clock_ticks)
+        res_late = guard.tick(
+            camera_images={
+                "observation.images.wrist": _make_valid_image(),
+                "observation.images.bev": _make_valid_image(),
+            },
+            adapter=adapter,
+            arm_positions=np.zeros(6),
+            now_fn=lambda: next(t_iter),
+        )
+        assert res_late.should_publish is False
+        assert res_late.publish_zero_base is True
+        assert res_late.arm_command is None
+        assert np.allclose(res_late.base_command, [0.0, 0.0, 0.0])
+
     def test_tick_valid_action_published_and_clamped(self):
         guard = PolicyGuard(policy_period=0.10, max_joint_delta_rad=0.15)
         raw_action = np.array([1.0, -1.0, 0.05, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0], dtype=np.float32)
@@ -562,9 +610,13 @@ class TestPolicyNodeWithROSStubs:
 
         node._inference_loop()
 
-        # Publishers must NOT have been called
+        # Arm command not published; zero base twist published
         node.joint_cmd_pub.publish.assert_not_called()
-        node.cmd_vel_pub.publish.assert_not_called()
+        node.cmd_vel_pub.publish.assert_called_once()
+        base_msg = node.cmd_vel_pub.publish.call_args[0][0]
+        assert base_msg.linear.x == 0.0
+        assert base_msg.linear.y == 0.0
+        assert base_msg.angular.z == 0.0
 
         # Warning logged
         warnings = node.get_logger().warnings
@@ -582,8 +634,14 @@ class TestPolicyNodeWithROSStubs:
 
         node._inference_loop()
 
+        # Arm command not published; zero base twist published
         node.joint_cmd_pub.publish.assert_not_called()
-        node.cmd_vel_pub.publish.assert_not_called()
+        node.cmd_vel_pub.publish.assert_called_once()
+        base_msg = node.cmd_vel_pub.publish.call_args[0][0]
+        assert base_msg.linear.x == 0.0
+        assert base_msg.linear.y == 0.0
+        assert base_msg.angular.z == 0.0
+
         warnings = node.get_logger().warnings
         assert any("missing or black" in w for w in warnings)
 
@@ -606,8 +664,14 @@ class TestPolicyNodeWithROSStubs:
 
         node._inference_loop()
 
+        # Arm command not published; zero base twist published
         node.joint_cmd_pub.publish.assert_not_called()
-        node.cmd_vel_pub.publish.assert_not_called()
+        node.cmd_vel_pub.publish.assert_called_once()
+        base_msg = node.cmd_vel_pub.publish.call_args[0][0]
+        assert base_msg.linear.x == 0.0
+        assert base_msg.linear.y == 0.0
+        assert base_msg.angular.z == 0.0
+
         warnings = node.get_logger().warnings
         assert any("action dropped" in w for w in warnings)
 

@@ -417,6 +417,7 @@ class PolicyNode(Node):
                 f"Waiting for valid images (missing or black: {invalid})",
                 throttle_duration_sec=2.0,
             )
+            self._publish_zero_base()
             return
 
         t0 = time.perf_counter() if self._diag_enabled else None
@@ -461,6 +462,7 @@ class PolicyNode(Node):
                     f"policy period ({self.policy_period * 1000.0:.1f}ms) — action dropped.",
                     throttle_duration_sec=1.0,
                 )
+                self._publish_zero_base()
                 return
 
             action_arr = np.asarray(action, dtype=np.float32).ravel()
@@ -474,6 +476,14 @@ class PolicyNode(Node):
             self.get_logger().error(
                 f"Inference error: {exc}", throttle_duration_sec=5.0
             )
+
+    def _publish_zero_base(self) -> None:
+        """Publish zero base velocity when policy tick is skipped."""
+        msg = Twist()
+        msg.linear.x = 0.0
+        msg.linear.y = 0.0
+        msg.angular.z = 0.0
+        self.cmd_vel_pub.publish(msg)
 
     def _publish_arm(self, arm_action: np.ndarray) -> None:
         msg = JointState()
