@@ -12,6 +12,9 @@ smolvla_node:
     base_vel_scale: 0.3
     # Max joint-target change per accepted command (same 0.15 rad limit as arm driver)
     max_joint_delta_rad: 0.15
+    # Joint angle limits (matching arm driver)
+    joint_min: [-3.14, -1.57, -1.57, -1.57, -3.14, -0.1]
+    joint_max: [3.14, 1.57, 1.57, 1.57, 3.14, 0.8]
     # TensorRT acceleration (Phase 1 — vision encoder only)
     # Set use_trt: true and point trt_engine_path at the pre-built engine.
     # Build the engine once with:

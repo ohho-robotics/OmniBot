@@ -239,10 +239,21 @@ class PolicyGuard:
         """Clamp arm action to max_joint_delta_rad from baseline and update last_arm_cmd.
 
         Baseline is last_arm_cmd if available, else reference (current joint positions).
+        The guard clamps both its output and its internal reference to joint limits.
         """
         baseline = (
             self.last_arm_cmd if self.last_arm_cmd is not None else reference
         )
+        if (
+            baseline is not None
+            and self.joint_min is not None
+            and self.joint_max is not None
+        ):
+            baseline = [
+                max(float(mn), min(float(mx), float(v)))
+                for v, mn, mx in zip(baseline, self.joint_min, self.joint_max)
+            ]
+
         clamped = clamp_arm_action(
             arm_action,
             baseline,
@@ -250,6 +261,14 @@ class PolicyGuard:
             joint_min=self.joint_min,
             joint_max=self.joint_max,
         )
+        if self.joint_min is not None and self.joint_max is not None:
+            clamped = np.array(
+                [
+                    max(float(mn), min(float(mx), float(v)))
+                    for v, mn, mx in zip(clamped, self.joint_min, self.joint_max)
+                ],
+                dtype=np.float32,
+            )
         self.last_arm_cmd = clamped
         return clamped
 

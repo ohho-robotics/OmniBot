@@ -261,6 +261,52 @@ class TestArmDeltaClamping:
         assert float(clamped[0]) <= 1.0
         assert pytest.approx(clamped[0]) == 1.0
 
+    def test_baseline_does_not_wind_past_joint_limits_and_reverses_immediately(self):
+        joint_min = [-3.14, -1.57, -1.57, -1.57, -3.14, -0.1]
+        joint_max = [3.14, 1.57, 1.57, 1.57, 3.14, 0.8]
+        guard = PolicyGuard(
+            max_joint_delta_rad=0.15,
+            joint_min=joint_min,
+            joint_max=joint_max,
+        )
+        ref = [3.0] + [0.0] * 5
+
+        # Command saturated value (10.0 rad) for multiple cycles
+        for _ in range(10):
+            cmd = guard.process_arm_action([10.0] + [0.0] * 5, reference=ref)
+            # Clamped to joint_max (3.14)
+            assert pytest.approx(cmd[0]) == 3.14
+            assert float(cmd[0]) <= 3.14 + 1e-5
+            assert pytest.approx(guard.last_arm_cmd[0]) == 3.14
+            assert float(guard.last_arm_cmd[0]) <= 3.14 + 1e-5
+
+        # Verify internal baseline did not wind past 3.14
+        assert pytest.approx(guard.last_arm_cmd[0]) == 3.14
+
+        # Reversing command must step immediately below 3.14 on cycle 1 (no unwinding lag)
+        rev = guard.process_arm_action([0.0] + [0.0] * 5, reference=ref)
+        assert pytest.approx(rev[0]) == 3.14 - 0.15
+        assert pytest.approx(guard.last_arm_cmd[0]) == 3.14 - 0.15
+
+        # Verify negative joint limit clamping and reversal
+        guard_neg = PolicyGuard(
+            max_joint_delta_rad=0.15,
+            joint_min=joint_min,
+            joint_max=joint_max,
+        )
+        ref_neg = [-3.0] + [0.0] * 5
+        for _ in range(10):
+            cmd_neg = guard_neg.process_arm_action([-10.0] + [0.0] * 5, reference=ref_neg)
+            assert pytest.approx(cmd_neg[0]) == -3.14
+            assert float(cmd_neg[0]) >= -3.14 - 1e-5
+            assert pytest.approx(guard_neg.last_arm_cmd[0]) == -3.14
+            assert float(guard_neg.last_arm_cmd[0]) >= -3.14 - 1e-5
+
+        assert pytest.approx(guard_neg.last_arm_cmd[0]) == -3.14
+        rev_neg = guard_neg.process_arm_action([0.0] + [0.0] * 5, reference=ref_neg)
+        assert pytest.approx(rev_neg[0]) == -3.14 + 0.15
+        assert pytest.approx(guard_neg.last_arm_cmd[0]) == -3.14 + 0.15
+
 
 # ---------------------------------------------------------------------------
 # 3. Latency check tests
@@ -596,6 +642,19 @@ class TestPolicyNodeWithROSStubs:
         assert "max_joint_delta_rad" in node._params
         assert node._params["max_joint_delta_rad"] == 0.15
         assert node.guard.max_joint_delta_rad == 0.15
+
+    def test_node_passes_joint_limits_to_guard(self):
+        from omnibot_lerobot import policy_node
+
+        node = policy_node.PolicyNode()
+        assert "joint_min" in node._params
+        assert "joint_max" in node._params
+        expected_min = [-3.14, -1.57, -1.57, -1.57, -3.14, -0.1]
+        expected_max = [3.14, 1.57, 1.57, 1.57, 3.14, 0.8]
+        assert node._params["joint_min"] == expected_min
+        assert node._params["joint_max"] == expected_max
+        assert node.guard.joint_min == expected_min
+        assert node.guard.joint_max == expected_max
 
     def test_node_refuses_black_frame_and_drops_publish(self):
         from omnibot_lerobot import policy_node

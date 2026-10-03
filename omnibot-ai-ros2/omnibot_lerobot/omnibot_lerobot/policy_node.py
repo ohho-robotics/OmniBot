@@ -158,6 +158,12 @@ class PolicyNode(Node):
         self.declare_parameter("use_depth", False)
         # Max joint-target change per cycle (same 0.15 rad limit as arm driver)
         self.declare_parameter("max_joint_delta_rad", MAX_JOINT_DELTA_RAD)
+        self.declare_parameter(
+            "joint_min", [-3.14, -1.57, -1.57, -1.57, -3.14, -0.1]
+        )
+        self.declare_parameter(
+            "joint_max", [3.14, 1.57, 1.57, 1.57, 3.14, 0.8]
+        )
 
         model_type = self.get_parameter("model_type").value
         checkpoint = self.get_parameter("checkpoint_path").value
@@ -176,6 +182,12 @@ class PolicyNode(Node):
         self.max_joint_delta_rad = float(
             self.get_parameter("max_joint_delta_rad").value
         )
+        self.joint_min = [
+            float(x) for x in self.get_parameter("joint_min").value
+        ]
+        self.joint_max = [
+            float(x) for x in self.get_parameter("joint_max").value
+        ]
         self.policy_period = (
             1.0 / self.policy_hz if self.policy_hz > 0 else 0.10
         )
@@ -219,6 +231,8 @@ class PolicyNode(Node):
             policy_period=self.policy_period,
             max_joint_delta_rad=self.max_joint_delta_rad,
             required_keys=self.adapter.image_keys,
+            joint_min=self.joint_min,
+            joint_max=self.joint_max,
             base_vel_scale=self.base_vel_scale,
         )
 
