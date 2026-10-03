@@ -14,6 +14,12 @@ Topics subscribed:
                           routed via arm_cmd_mux (omnibot_rl) which selects between
                           SmolVLA (/arm/joint_commands) and RL (/arm/joint_commands/rl)
   /arm/enable             (std_msgs/Bool)           - enable/disable torque
+  /emergency_stop         (std_msgs/Bool)           - true forces Torque_Enable 0
+
+Safety (limits, per-cycle delta, command-timeout hold, e-stop torque latch)
+lives in arm_safety.py so it can be tested without ROS. This node only
+reads parameters, calls that helper, and writes the bus. Position servos
+only — no force control. Untested on hardware.
 """
 
 import collections
@@ -24,6 +30,9 @@ import time
 from arm_math import clamp_radians as _clamp_radians
 from arm_math import radians_to_ticks as _radians_to_ticks
 from arm_math import ticks_to_radians as _ticks_to_radians
+from arm_safety import COMMAND_TIMEOUT_SEC
+from arm_safety import MAX_JOINT_DELTA_RAD
+from arm_safety import ArmSafety
 
 import rclpy
 from rclpy.node import Node
@@ -71,6 +80,10 @@ class ArmDriverNode(Node):
         self.declare_parameter("home_ticks", [2048, 2048, 2048, 2048, 2048, 2048])
         self.declare_parameter("joint_min", [-3.14, -1.57, -1.57, -1.57, -3.14, -0.1])
         self.declare_parameter("joint_max", [3.14, 1.57, 1.57, 1.57, 3.14, 0.8])
+        # Same limit OHH-100 reuses (arm_safety.MAX_JOINT_DELTA_RAD).
+        self.declare_parameter("max_joint_delta_rad", MAX_JOINT_DELTA_RAD)
+        # Hold the last /arm/joint_commands/out target after this silence.
+        self.declare_parameter("command_timeout_sec", COMMAND_TIMEOUT_SEC)
         # Set True to publish rolling cycle-time stats to /diagnostics at 1 Hz.
         self.declare_parameter("publish_diagnostics", False)
 
@@ -85,6 +98,12 @@ class ArmDriverNode(Node):
         self.home_ticks = list(self.get_parameter("home_ticks").value)
         self.joint_min = list(self.get_parameter("joint_min").value)
         self.joint_max = list(self.get_parameter("joint_max").value)
+        self.max_joint_delta_rad = float(
+            self.get_parameter("max_joint_delta_rad").value
+        )
+        self.command_timeout_sec = float(
+            self.get_parameter("command_timeout_sec").value
+        )
 
         self.num_joints = len(self.joint_names)
         self.ticks_per_rad = self.ticks_per_rev / (2.0 * math.pi)
@@ -101,7 +120,13 @@ class ArmDriverNode(Node):
         self.follower_bus = None
         self.leader_bus = None
         self.sim_positions = [0.0] * self.num_joints  # simulation passthrough
-        self.torque_enabled = True
+        self._safety = ArmSafety(
+            joint_min=self.joint_min,
+            joint_max=self.joint_max,
+            max_joint_delta_rad=self.max_joint_delta_rad,
+            command_timeout_sec=self.command_timeout_sec,
+        )
+        self.torque_enabled = self._safety.torque_enabled
 
         # ------------------------------------------------------------------
         # Publishers
@@ -121,6 +146,9 @@ class ArmDriverNode(Node):
             JointState, "/arm/joint_commands/out", self.joint_command_cb, 10
         )
         self.create_subscription(Bool, "/arm/enable", self.enable_cb, 10)
+        self.create_subscription(
+            Bool, "/emergency_stop", self.emergency_stop_cb, 10
+        )
 
         # ------------------------------------------------------------------
         # Connect hardware
@@ -152,7 +180,9 @@ class ArmDriverNode(Node):
 
         self.get_logger().info(
             f"ArmDriverNode started | hardware={'real' if LEROBOT_AVAILABLE and self.follower_bus else 'sim'} "
-            f"| teleop={self.teleop_mode} | joints={self.joint_names}"
+            f"| teleop={self.teleop_mode} | joints={self.joint_names} "
+            f"| max_joint_delta_rad={self.max_joint_delta_rad} "
+            f"| command_timeout_sec={self.command_timeout_sec}"
         )
 
     # ------------------------------------------------------------------
@@ -248,6 +278,16 @@ class ArmDriverNode(Node):
             ljs.position = leader_pos
             self.leader_state_pub.publish(ljs)
 
+        self._hold_stale_command()
+
+    def _hold_stale_command(self):
+        """Re-send the last target once when /arm/joint_commands/out goes quiet."""
+        action = self._safety.hold_if_stale(time.monotonic())
+        if action.message:
+            self.get_logger().warn(action.message)
+        if action.rewrite:
+            self._write_joint_targets(action.positions)
+
     def _read_follower_positions(self):
         """Read follower arm positions; returns radians list."""
         if self.follower_bus is not None:
@@ -321,17 +361,24 @@ class ArmDriverNode(Node):
 
     def joint_command_cb(self, msg: JointState):
         """Receive commanded joint positions and write to follower arm."""
-        if not self.torque_enabled:
-            return
-
-        # Build ordered position list matching self.joint_names
         name_to_pos = dict(zip(msg.name, msg.position))
-        commanded = [name_to_pos.get(n, 0.0) for n in self.joint_names]
-        commanded = self.clamp_radians(commanded)
+        commanded = [float(name_to_pos.get(n, 0.0)) for n in self.joint_names]
+        if self._safety.last_command is None and self.follower_bus is not None:
+            reference = self._read_follower_positions()
+        else:
+            reference = list(self.sim_positions)
+        action = self._safety.accept_command(
+            commanded, time.monotonic(), reference
+        )
+        if not action.write:
+            return
+        self._write_joint_targets(action.positions)
 
+    def _write_joint_targets(self, positions):
+        """Write a position goal. Simulation mirrors it in sim_positions."""
         if self.follower_bus is not None:
             try:
-                ticks = self.radians_to_ticks(commanded)
+                ticks = self.radians_to_ticks(positions)
                 values_dict = {
                     name: tick for name, tick in zip(self.joint_names, ticks)
                 }
@@ -341,22 +388,66 @@ class ArmDriverNode(Node):
                     f"Follower write error: {exc}", throttle_duration_sec=5.0
                 )
         else:
-            # Simulation mode: passthrough
-            self.sim_positions = commanded
+            self.sim_positions = list(positions)
 
-    def enable_cb(self, msg: Bool):
-        """Enable or disable torque on the follower arm."""
-        self.torque_enabled = msg.data
-        status = "enabled" if msg.data else "disabled"
-        self.get_logger().info(f"Arm torque {status}")
+    def _log_action(self, action):
+        if not action.message:
+            return
+        if action.level == "warn":
+            self.get_logger().warn(action.message)
+        else:
+            self.get_logger().info(action.message)
 
+    def _write_torque_enable(self, value):
+        """Write Torque_Enable. value 0 disables, 1 enables, None skips the bus."""
+        self.torque_enabled = self._safety.torque_enabled
+        if self.follower_bus is None or value is None:
+            return
+        try:
+            values_dict = {name: int(value) for name in self.joint_names}
+            self.follower_bus.write("Torque_Enable", values_dict)
+        except Exception as exc:
+            self.get_logger().warn(f"Torque write error: {exc}")
+
+    def _read_present_positions_on_enable(self):
+        """Read measured joint positions from bus on torque-on.
+
+        Returns list of radians on success, or None if bus is connected but read fails.
+        In simulation (follower_bus is None), returns sim_positions.
+        """
         if self.follower_bus is not None:
             try:
-                torque_val = 1 if msg.data else 0
-                values_dict = {name: torque_val for name in self.joint_names}
-                self.follower_bus.write("Torque_Enable", values_dict)
+                ticks_dict = self.follower_bus.read("Present_Position")
+                ticks = [int(ticks_dict[name]) for name in self.joint_names]
+                rads = self.ticks_to_radians(ticks)
+                return [float(r) for r in rads]
             except Exception as exc:
-                self.get_logger().warn(f"Torque write error: {exc}")
+                self.get_logger().warn(
+                    f"Follower read error on torque-on: {exc}"
+                )
+                return None
+        return list(self.sim_positions)
+
+    def enable_cb(self, msg: Bool):
+        """Enable or disable torque. Ignored while /emergency_stop is true."""
+        action = self._safety.on_arm_enable(bool(msg.data))
+        self._log_action(action)
+        self._write_torque_enable(action.value)
+        if action.value == 1:
+            measured = self._read_present_positions_on_enable()
+            if measured is not None:
+                self._safety.seed_target(measured, time.monotonic())
+                self._write_joint_targets(measured)
+            else:
+                self.get_logger().warn(
+                    "Cannot read present position on torque-on; initial goal not written."
+                )
+
+    def emergency_stop_cb(self, msg: Bool):
+        """Drop follower torque. Clearing the stop does not turn it back on."""
+        action = self._safety.on_emergency_stop(bool(msg.data))
+        self._log_action(action)
+        self._write_torque_enable(action.value)
 
     # ------------------------------------------------------------------
     # Cleanup

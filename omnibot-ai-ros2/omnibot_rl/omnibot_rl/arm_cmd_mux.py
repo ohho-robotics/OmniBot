@@ -39,6 +39,10 @@ forwarded until /control_mode is vla, nav2, or rl_nav. /arm/joint_commands
 is shared by the visuomotor policy and Android joint teleop, so Android
 arm commands are held in teleop as well. Base teleop uses /cmd_vel/teleop
 and is not gated here. Not run on hardware in this change.
+
+This mux does not clamp, hold, or drop torque. arm_driver_node applies
+those checks on /arm/joint_commands/out (emergency stop, 200 ms silence
+hold, joint limits, and MAX_JOINT_DELTA_RAD per cycle).
 """
 
 from omnibot_rl.arm_stream_gate import ArmStreamGate
