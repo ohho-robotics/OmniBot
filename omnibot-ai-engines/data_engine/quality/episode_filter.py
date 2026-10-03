@@ -26,6 +26,8 @@ from data_engine.schema.camera_keys import (
 )
 from data_engine.schema.constants import ARM_JOINT_NAMES
 
+CAMERA_SKEW_UNCHECKED = "camera_skew: unchecked (no per-camera timestamps)"
+
 # ---------------------------------------------------------------------------
 # Thresholds and Result Dataclasses
 # ---------------------------------------------------------------------------
@@ -39,7 +41,22 @@ class FilterThresholds:
     max_camera_skew_s: float = 0.05
     max_joint_step_rad: float = 0.5
     min_duration_s: float = 2.0
-    frame_diff_threshold: float = 0.0
+    # Mean absolute pixel difference (MAD) on a 0-255 scale below which frames are
+    # considered identical. Lossy .mp4 codecs introduce quantization noise (+/-1-2
+    # levels, MAD ~0.5-1.8) on static scenes; a default tolerance of 2.0 catches
+    # stuck cameras after decode while genuine physical motion produces MAD >> 2.0.
+    frame_diff_threshold: float = 2.0
+    missing_camera_timestamps: str = "unchecked"  # "unchecked" or "reject"
+    continuous_joints: set[str] = field(default_factory=lambda: {"wrist_roll"})
+
+    def __post_init__(self) -> None:
+        if isinstance(self.continuous_joints, (list, tuple)):
+            self.continuous_joints = set(self.continuous_joints)
+        if self.missing_camera_timestamps not in ("unchecked", "reject"):
+            raise ValueError(
+                f"missing_camera_timestamps must be 'unchecked' or 'reject', "
+                f"got {self.missing_camera_timestamps!r}"
+            )
 
 
 @dataclass
@@ -48,7 +65,7 @@ class EpisodeMetrics:
 
     duration_s: float = 0.0
     max_frozen_duration_s: float = 0.0
-    max_camera_skew_s: float = 0.0
+    max_camera_skew_s: float | None = None
     max_joint_step_rad: float = 0.0
     frame_count: int = 0
     fps: float = 30.0
@@ -64,6 +81,13 @@ class EpisodeScore:
     status: str  # "keep" or "reject"
     reasons: list[str]
     metrics: EpisodeMetrics
+    camera_skew: str | None = None
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def camera_skew_unchecked(self) -> bool:
+        """Whether camera skew was unchecked due to missing per-camera timestamps."""
+        return self.camera_skew == CAMERA_SKEW_UNCHECKED
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,10 +95,16 @@ class EpisodeScore:
             "passed": self.passed,
             "status": self.status,
             "reasons": self.reasons,
+            "warnings": self.warnings,
+            "camera_skew": self.camera_skew,
             "metrics": {
                 "duration_s": round(self.metrics.duration_s, 4),
                 "max_frozen_duration_s": round(self.metrics.max_frozen_duration_s, 4),
-                "max_camera_skew_s": round(self.metrics.max_camera_skew_s, 4),
+                "max_camera_skew_s": (
+                    round(self.metrics.max_camera_skew_s, 4)
+                    if self.metrics.max_camera_skew_s is not None
+                    else None
+                ),
                 "max_joint_step_rad": round(self.metrics.max_joint_step_rad, 4),
                 "frame_count": self.metrics.frame_count,
                 "fps": round(self.metrics.fps, 2),
@@ -106,6 +136,8 @@ class DatasetFilterResult:
                 "max_joint_step_rad": self.thresholds.max_joint_step_rad,
                 "min_duration_s": self.thresholds.min_duration_s,
                 "frame_diff_threshold": self.thresholds.frame_diff_threshold,
+                "missing_camera_timestamps": self.thresholds.missing_camera_timestamps,
+                "continuous_joints": sorted(list(self.thresholds.continuous_joints)),
             },
             "kept": self.kept,
             "rejected": self.rejected,
@@ -280,18 +312,35 @@ def check_duration(
     return duration, False, None
 
 
+def _is_continuous_joint(name: str, continuous_set: set[str]) -> bool:
+    if name in continuous_set:
+        return True
+    if name.startswith("arm_") and name[4:] in continuous_set:
+        return True
+    if f"arm_{name}" in continuous_set:
+        return True
+    return False
+
+
 def check_joint_jump(
-    states: np.ndarray,
+    states: np.ndarray | Sequence[Sequence[float]],
     max_joint_step_rad: float = 0.5,
     joint_indices: Sequence[int] | None = None,
+    joint_names: Sequence[str] | None = None,
+    continuous_joints: set[str] | Sequence[str] | None = None,
 ) -> tuple[float, bool, str | None]:
     """Check for discontinuous joint jumps between consecutive frames.
+
+    Uses shortest angular distance for continuous joints (wrapping at +/-pi),
+    and raw absolute difference for limited joints.
 
     Args:
         states: Array of robot states shape (N, D).
         max_joint_step_rad: Max allowed change in radians in one step.
         joint_indices: Optional indices in state vector corresponding to arm joints.
                        Defaults to the first len(ARM_JOINT_NAMES) columns (6).
+        joint_names: Optional custom names for the evaluated joints.
+        continuous_joints: Set/sequence of continuous joint names that wrap (default: {"wrist_roll"}).
 
     Returns:
         (max_step_rad, is_rejected, reason_if_rejected)
@@ -305,19 +354,41 @@ def check_joint_jump(
 
     if joint_indices is not None:
         joints = arr[:, joint_indices]
-        names = [
-            ARM_JOINT_NAMES[idx] if idx < len(ARM_JOINT_NAMES) else f"joint_{idx}"
-            for idx in joint_indices
-        ]
+        if joint_names is not None:
+            names = list(joint_names)
+        else:
+            names = [
+                ARM_JOINT_NAMES[idx] if idx < len(ARM_JOINT_NAMES) else f"joint_{idx}"
+                for idx in joint_indices
+            ]
     else:
         n_joints = min(len(ARM_JOINT_NAMES), arr.shape[1])
         joints = arr[:, :n_joints]
-        names = ARM_JOINT_NAMES[:n_joints]
+        if joint_names is not None:
+            names = list(joint_names[:n_joints])
+        else:
+            names = list(ARM_JOINT_NAMES[:n_joints])
 
     if joints.shape[1] == 0:
         return 0.0, False, None
 
-    diffs = np.abs(np.diff(joints, axis=0))
+    if continuous_joints is None:
+        cont_set = {"wrist_roll"}
+    elif isinstance(continuous_joints, (list, tuple)):
+        cont_set = set(continuous_joints)
+    else:
+        cont_set = continuous_joints
+
+    raw_diffs = np.diff(joints, axis=0)
+    diffs = np.zeros_like(raw_diffs)
+
+    for j_idx, j_name in enumerate(names):
+        col = raw_diffs[:, j_idx]
+        if _is_continuous_joint(j_name, cont_set):
+            diffs[:, j_idx] = np.abs((col + np.pi) % (2 * np.pi) - np.pi)
+        else:
+            diffs[:, j_idx] = np.abs(col)
+
     max_step = float(np.max(diffs))
 
     if max_step > max_joint_step_rad:
@@ -336,25 +407,35 @@ def check_camera_skew(
     wrist_timestamps: Sequence[float] | np.ndarray | None,
     bev_timestamps: Sequence[float] | np.ndarray | None,
     max_camera_skew_s: float = 0.05,
-) -> tuple[float, bool, str | None]:
+    missing_mode: str = "unchecked",
+) -> tuple[float | None, bool, str | None]:
     """Check timestamp skew between wrist and bird's-eye view cameras.
 
     Args:
         wrist_timestamps: Timestamps of wrist camera frames.
         bev_timestamps: Timestamps of BEV camera frames.
         max_camera_skew_s: Max allowed delta in seconds (default: 50 ms = 0.05 s).
+        missing_mode: Action when timestamps are missing:
+            "unchecked" (default): skew not measured (returns None, False, None),
+            "reject": reject episode with reason "camera_skew: unchecked (no per-camera timestamps)".
 
     Returns:
         (max_skew_s, is_rejected, reason_if_rejected)
+        max_skew_s is None when timestamps are not available.
     """
+    has_timestamps = True
     if wrist_timestamps is None or bev_timestamps is None:
-        return 0.0, False, None
+        has_timestamps = False
+    else:
+        t_w = np.asarray(wrist_timestamps, dtype=np.float64)
+        t_b = np.asarray(bev_timestamps, dtype=np.float64)
+        if len(t_w) == 0 or len(t_b) == 0:
+            has_timestamps = False
 
-    t_w = np.asarray(wrist_timestamps, dtype=np.float64)
-    t_b = np.asarray(bev_timestamps, dtype=np.float64)
-
-    if len(t_w) == 0 or len(t_b) == 0:
-        return 0.0, False, None
+    if not has_timestamps:
+        if missing_mode == "reject":
+            return None, True, CAMERA_SKEW_UNCHECKED
+        return None, False, None
 
     if np.median(t_w) > 1e12 or np.max(t_w) > 1e12:
         t_w = t_w * 1e-9
@@ -381,17 +462,24 @@ def check_frozen_frames(
     timestamps: Sequence[float] | np.ndarray | None = None,
     fps: float = 30.0,
     max_frozen_s: float = 0.5,
-    frame_diff_threshold: float = 0.0,
+    frame_diff_threshold: float = 2.0,
     cam_key: str = "camera",
 ) -> tuple[float, bool, str | None]:
     """Check if camera stream has identical consecutive frames for longer than max_frozen_s.
 
     Args:
-        frames: Iterable yielding 2D/3D numpy arrays.
+        frames: Iterable yielding 2D/3D numpy arrays (uint8 pixel values on a 0-255 scale).
         timestamps: Optional per-frame timestamps.
         fps: Frame rate if timestamps are omitted.
         max_frozen_s: Max allowable frozen duration in seconds (default: 0.5 s).
-        frame_diff_threshold: Mean absolute pixel difference to consider identical (default: 0.0).
+        frame_diff_threshold: Mean absolute pixel difference (MAD) on a 0-255 scale
+            to consider consecutive frames identical/frozen (default: 2.0).
+            H.264/lossy compression noise on static scenes typically causes small
+            quantization jitter of +/-1-2 intensity levels per pixel (MAD ~0.5-1.8).
+            A threshold of 2.0 treats these compression artifacts as identical frames,
+            preventing stuck cameras in lossy .mp4 files from bypassing the filter,
+            while genuine physical motion produces macro-level visual changes (MAD >> 2.0).
+            Pass 0.0 for exact byte-for-byte pixel equality.
         cam_key: Camera name for reporting.
 
     Returns:
@@ -470,6 +558,7 @@ def score_episode(
     """Score a single demonstration episode against all 4 quality rules."""
     thresh = thresholds or FilterThresholds()
     reasons: list[str] = []
+    warnings: list[str] = []
 
     frame_count = len(states) if states is not None else 0
     if timestamps is not None:
@@ -489,6 +578,7 @@ def score_episode(
     max_step_rad, jump_rej, jump_reason = check_joint_jump(
         states=states,
         max_joint_step_rad=thresh.max_joint_step_rad,
+        continuous_joints=thresh.continuous_joints,
     )
     if jump_rej and jump_reason:
         reasons.append(jump_reason)
@@ -498,9 +588,17 @@ def score_episode(
         wrist_timestamps=wrist_timestamps,
         bev_timestamps=bev_timestamps,
         max_camera_skew_s=thresh.max_camera_skew_s,
+        missing_mode=thresh.missing_camera_timestamps,
     )
     if skew_rej and skew_reason:
         reasons.append(skew_reason)
+
+    if max_camera_skew_s is None:
+        camera_skew_desc = CAMERA_SKEW_UNCHECKED
+        if not skew_rej:
+            warnings.append(CAMERA_SKEW_UNCHECKED)
+    else:
+        camera_skew_desc = f"{max_camera_skew_s:.4f}s"
 
     # 4. Rule 4: Identical frames for > 0.5 s (per camera)
     max_frozen_duration_s = 0.0
@@ -548,6 +646,8 @@ def score_episode(
         status=status,
         reasons=reasons,
         metrics=metrics,
+        camera_skew=camera_skew_desc,
+        warnings=warnings,
     )
 
 
@@ -712,11 +812,15 @@ def filter_dataset(
             rejected.append(ep_idx)
 
     total = len(ep_indices)
+    unchecked_skew_count = sum(
+        1 for ep in episode_scores.values() if ep.camera_skew == CAMERA_SKEW_UNCHECKED
+    )
     summary = {
         "total_episodes": total,
         "kept_episodes": len(kept),
         "rejected_episodes": len(rejected),
         "keep_ratio": round(len(kept) / total, 4) if total > 0 else 0.0,
+        CAMERA_SKEW_UNCHECKED: unchecked_skew_count,
     }
 
     return DatasetFilterResult(

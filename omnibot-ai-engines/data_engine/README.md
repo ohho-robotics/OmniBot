@@ -75,9 +75,13 @@ python -m data_engine.scripts.filter_episodes \
 #### Rejection Rules & CLI Thresholds
 
 An episode is rejected if any of the following conditions occur:
-1. **Frozen video**: Identical consecutive frames for >0.5 s (`--max-frozen-s 0.5`).
+1. **Frozen video**: Consecutive frames with mean absolute pixel difference $\le$ threshold (`--frame-diff-threshold 2.0` on a 0–255 scale) for >0.5 s (`--max-frozen-s 0.5`).
+   - Production episodes are lossy `.mp4` video files where compression/decompression introduces slight byte-level quantization noise (typically $\pm$1–2 intensity levels, MAD ~0.5–1.8) on static scenes. Exact pixel equality fails to catch stuck cameras in lossy video; a default tolerance of 2.0 treats this codec noise as identical frames while preserving genuine motion (MAD $\gg 2.0$). Pass `--frame-diff-threshold 0.0` for exact byte-for-byte pixel matching.
 2. **Camera timestamp skew**: Wrist vs bird's-eye view camera timestamp delta >50 ms (`--max-camera-skew-s 0.05` or `--max-camera-skew-ms 50.0`).
+   - `--missing-camera-timestamps {unchecked,reject}` (default: `unchecked`): When separate per-camera timestamps are missing, the skew is not measured (`max_camera_skew_s` is reported as `null`). In `unchecked` mode, the episode is kept and the report notes `camera_skew: unchecked (no per-camera timestamps)` with a count in the summary. In `reject` mode, episodes without per-camera timestamps are rejected with that reason.
+   - *Recorder Gap*: Ingested LeRobot v2.0 datasets standardly write a single shared `timestamp` column. Measuring camera skew requires per-camera timestamp columns (e.g., `observation.images.wrist.timestamp`, `observation.images.bev.timestamp`) or sidecar timestamp arrays (`videos/.../{episode}_timestamps.npy`). Safe recorder node changes to expose hardware frame timestamps require ROS 2 Jazzy and physical/simulated cameras to verify.
 3. **Joint step**: Joint position change >0.5 rad between consecutive frames (`--max-joint-step-rad 0.5`).
+   - Evaluates shortest angular distance across the $\pm\pi$ wrap for continuous joints (configured via `--continuous-joints`, default: `wrist_roll`). Limited joints such as `shoulder_pan` (limited to $[-1.92, 1.92]$ rad per the robot URDF in `omnibot.urdf.xacro`) retain raw differences so large steps are rejected.
 4. **Short episode**: Episode duration shorter than 2.0 s (`--min-duration-s 2.0`).
 
 The filter outputs a JSON report with summary statistics, lists of `kept` and `rejected` episode indices, and per-episode metrics and failure reasons. In synthetic tests or environments without video codecs, `FrameSource` abstracts frame access and loads `.npy` arrays directly.
