@@ -132,6 +132,35 @@ class TestStopWithinOneCycle:
         mux_node._teleop_cb(_make_twist(0.2))
         mux_node._out_pub.publish.assert_called_once()
 
+    def test_switch_teleop_to_autonomous_zeros_output(self, mux_node):
+        assert mux_node._active_mode == "teleop"
+        mux_node._out_pub.reset_mock()
+        _set_mode(mux_node, "vla")
+        assert mux_node._out_pub.publish.call_count == 1
+        zero = mux_node._out_pub.publish.call_args[0][0]
+        assert zero.linear.x == pytest.approx(0.0)
+        assert zero.angular.z == pytest.approx(0.0)
+
+    def test_switch_between_autonomous_modes_zeros_output(self, mux_node):
+        _set_mode(mux_node, "vla")
+        mux_node._out_pub.reset_mock()
+        _set_mode(mux_node, "nav2")
+        assert mux_node._out_pub.publish.call_count == 1
+        zero = mux_node._out_pub.publish.call_args[0][0]
+        assert zero.linear.x == pytest.approx(0.0)
+        assert zero.angular.z == pytest.approx(0.0)
+
+    def test_repeated_mode_does_not_publish_zero(self, mux_node):
+        _set_mode(mux_node, "vla")
+        mux_node._out_pub.reset_mock()
+        _set_mode(mux_node, "vla")
+        mux_node._out_pub.publish.assert_not_called()
+
+    def test_unknown_mode_does_not_publish_zero(self, mux_node):
+        mux_node._out_pub.reset_mock()
+        _set_mode(mux_node, "unknown_mode")
+        mux_node._out_pub.publish.assert_not_called()
+
     def test_emergency_stop_zeros_and_blocks_teleop(self, mux_node):
         mux_node._out_pub.reset_mock()
         stop = Bool()
