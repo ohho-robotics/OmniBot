@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from typing import List, Tuple
 import numpy as np
 
+from data_engine.schema.camera_keys import (
+    OBSERVATION_IMAGE_BEV,
+    OBSERVATION_IMAGE_WRIST,
+)
+
 # ---------------------------------------------------------------------------
 # Mobile manipulation — arm joint names
 # ---------------------------------------------------------------------------
@@ -169,12 +174,28 @@ ALL_CAMERAS = [
     CAMERA_DEPTH,
 ]
 
-# LeRobot feature key → CameraConfig mapping.
-# Mirrors the camera streams written by bag_to_omnibot.py (front + wrist).
+# LeRobot feature key → CameraConfig. Wrist + bird's-eye view only.
+# Writers (bag_to_omnibot) and the validator both read this mapping.
 LEROBOT_CAMERA_KEYS = {
-    "observation.images.front": CAMERA_FRONT,
-    "observation.images.wrist": CAMERA_WRIST,
+    OBSERVATION_IMAGE_WRIST: CAMERA_WRIST,
+    OBSERVATION_IMAGE_BEV: CAMERA_BEV,
 }
+
+
+def lerobot_image_features(fps: int = 30) -> dict:
+    """Video feature entries for ``LEROBOT_CAMERA_KEYS``."""
+    features = {}
+    for key, cam in LEROBOT_CAMERA_KEYS.items():
+        features[key] = {
+            "dtype": "video",
+            "shape": [cam.height, cam.width, 3],
+            "info": {
+                "video.fps": fps,
+                "video.codec": "h264",
+                "video.pix_fmt": "yuv420p",
+            },
+        }
+    return features
 
 # ---------------------------------------------------------------------------
 # Mobile manipulation — unified 9D state / action specs

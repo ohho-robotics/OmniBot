@@ -15,9 +15,9 @@ Output layout (appended to an existing or new dataset root):
                 episode_XXXXXX.parquet
         videos/
             chunk-000/
-                observation.images.front/
-                    episode_XXXXXX.mp4
                 observation.images.wrist/
+                    episode_XXXXXX.mp4
+                observation.images.bev/
                     episode_XXXXXX.mp4
 
 Usage (CLI):
@@ -44,10 +44,10 @@ import pyarrow.parquet as pq
 from data_engine.ingestion.ros_parser import ROSBagParser
 from data_engine.ingestion.sync_topics import TopicSynchronizer
 from data_engine.schema.constants import (
+    LEROBOT_CAMERA_KEYS,
     MOBILE_MANIP_ACTION_SPEC,
     MOBILE_MANIP_STATE_SPEC,
-    CAMERA_FRONT,
-    CAMERA_WRIST,
+    lerobot_image_features,
 )
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -72,14 +72,14 @@ _PARQUET_SCHEMA = pa.schema(
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
-def _load_meta(dataset_root: Path) -> dict[str, Any]:
+def _load_meta(dataset_root: Path, fps: int = 30) -> dict[str, Any]:
     info_path = dataset_root / "meta" / "info.json"
     if info_path.exists():
         return json.loads(info_path.read_text())
     return {
         "codebase_version": CODEBASE_VERSION,
         "robot_type": "omnibot",
-        "fps": 30,
+        "fps": fps,
         "total_episodes": 0,
         "total_frames": 0,
         "chunks_size": CHUNK_SIZE_EPISODES,
@@ -94,24 +94,7 @@ def _load_meta(dataset_root: Path) -> dict[str, Any]:
                 "shape": [MOBILE_MANIP_ACTION_SPEC.dim],
                 "names": MOBILE_MANIP_ACTION_SPEC.names,
             },
-            "observation.images.front": {
-                "dtype": "video",
-                "shape": [CAMERA_FRONT.height, CAMERA_FRONT.width, 3],
-                "info": {
-                    "video.fps": 30,
-                    "video.codec": "h264",
-                    "video.pix_fmt": "yuv420p",
-                },
-            },
-            "observation.images.wrist": {
-                "dtype": "video",
-                "shape": [CAMERA_WRIST.height, CAMERA_WRIST.width, 3],
-                "info": {
-                    "video.fps": 30,
-                    "video.codec": "h264",
-                    "video.pix_fmt": "yuv420p",
-                },
-            },
+            **lerobot_image_features(fps),
         },
     }
 
@@ -193,7 +176,7 @@ def bag_to_omnibot(
     dataset_root = Path(dataset_root)
 
     # ── Load existing metadata ────────────────────────────────────────────
-    info = _load_meta(dataset_root)
+    info = _load_meta(dataset_root, fps)
     episode_idx = info["total_episodes"]
     task_idx = _ensure_task(dataset_root, task_name)
     chunk = episode_idx // CHUNK_SIZE_EPISODES
@@ -213,8 +196,7 @@ def bag_to_omnibot(
     t0 = frames_sync[0]["timestamp"]
 
     rows: list[dict] = []
-    front_frames: list[np.ndarray] = []
-    wrist_frames: list[np.ndarray] = []
+    cam_frames: dict[str, list[np.ndarray]] = {key: [] for key in LEROBOT_CAMERA_KEYS}
 
     for local_idx, frame in enumerate(frames_sync):
         state = frame.get("state", [0.0] * MOBILE_MANIP_STATE_SPEC.dim)
@@ -233,19 +215,15 @@ def bag_to_omnibot(
             }
         )
 
-        # Images: syncer returns np arrays (BGR) or None
-        front = frame.get("camera_front")
-        wrist = frame.get("camera_wrist")
-        front_frames.append(
-            front
-            if front is not None
-            else np.zeros((CAMERA_FRONT.height, CAMERA_FRONT.width, 3), np.uint8)
-        )
-        wrist_frames.append(
-            wrist
-            if wrist is not None
-            else np.zeros((CAMERA_WRIST.height, CAMERA_WRIST.width, 3), np.uint8)
-        )
+        # Images: syncer returns np arrays (BGR) or None.
+        # Stream names follow CameraConfig.name: camera_wrist, camera_bev.
+        for key, cam in LEROBOT_CAMERA_KEYS.items():
+            image = frame.get(f"camera_{cam.name}")
+            cam_frames[key].append(
+                image
+                if image is not None
+                else np.zeros((cam.height, cam.width, 3), np.uint8)
+            )
 
     # ── Write Parquet ─────────────────────────────────────────────────────
     data_dir = dataset_root / "data" / f"chunk-{chunk:03d}"
@@ -259,12 +237,8 @@ def bag_to_omnibot(
 
     # ── Write videos ──────────────────────────────────────────────────────
     vid_base = dataset_root / "videos" / f"chunk-{chunk:03d}"
-    _write_video(
-        front_frames, vid_base / "observation.images.front" / f"{ep_str}.mp4", fps
-    )
-    _write_video(
-        wrist_frames, vid_base / "observation.images.wrist" / f"{ep_str}.mp4", fps
-    )
+    for key, frames in cam_frames.items():
+        _write_video(frames, vid_base / key / f"{ep_str}.mp4", fps)
 
     # ── Update metadata ───────────────────────────────────────────────────
     ep_length = len(rows)

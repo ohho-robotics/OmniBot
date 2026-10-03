@@ -22,7 +22,7 @@ jobs:
             -e omnibot-ai-engines/learning_engine \
             -e omnibot-ai-engines/agent_engine \
             -e yahboom-python-driver \
-            pytest numpy ruff
+            pytest numpy pyarrow click ruff
       - name: Ruff
         run: ruff check .
       - name: CPU suites

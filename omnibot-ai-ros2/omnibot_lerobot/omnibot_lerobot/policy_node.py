@@ -287,7 +287,6 @@ class PolicyNode(Node):
         _MAP = {
             "observation.images.wrist": "/camera/wrist/image_raw",
             "observation.images.bev": "/camera/base/bev/image_raw",
-            "observation.images.front": "/camera/front/image_raw",
             "observation.images.depth": "/camera/depth/image_raw",
         }
         return _MAP.get(key, f"/camera/{key.split('.')[-1]}/image_raw")

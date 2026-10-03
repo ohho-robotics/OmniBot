@@ -74,12 +74,6 @@ class EpisodeLoggerNode(Node):  # type: ignore[misc]
         )
         self.create_subscription(
             Image,
-            topics.CAMERA_FRONT,
-            lambda m: self._on_image(schema.OBS_IMAGE_FRONT, m),
-            5,
-        )
-        self.create_subscription(
-            Image,
             topics.CAMERA_BEV,
             lambda m: self._on_image(schema.OBS_IMAGE_BEV, m),
             5,

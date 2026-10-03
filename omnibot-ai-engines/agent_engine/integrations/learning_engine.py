@@ -167,12 +167,14 @@ class EvaluatorReflector:
             Step,
         )
 
+        from learning_engine.data.schema import OBS_IMAGE_WRIST
+
         tool_failed = any(not r.ok for r in history)
         env_success = bool(history) and not tool_failed and not world.emergency_stop
         obs: Dict[str, np.ndarray] = world.to_observation()
         frames = world.extra.get("frames")
         if frames:
-            obs["images.front"] = np.asarray(frames[-1])
+            obs[OBS_IMAGE_WRIST] = np.asarray(frames[-1])
         step = Step(
             observation=obs,
             action=np.zeros(9, dtype=np.float32),

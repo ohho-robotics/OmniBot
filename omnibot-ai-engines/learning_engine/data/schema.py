@@ -16,14 +16,16 @@ SCHEMA_VERSION = "1.0"
 # Observation keys (values are numpy arrays)
 # ---------------------------------------------------------------------------
 OBS_STATE = "state"  # proprioception vector
-OBS_IMAGE_FRONT = "images.front"  # 480x640x3 bgr8  (/camera/front/image_raw)
 OBS_IMAGE_WRIST = "images.wrist"  # 240x320x3 bgr8  (/camera/wrist/image_raw)
 OBS_IMAGE_BEV = "images.bev"  # stitched BEV   (/camera/base/bev/image_raw)
+# Physical front camera. BEV-stitcher input, not a LeRobot dataset feature.
+OBS_IMAGE_FRONT = "images.front"  # 480x640x3 bgr8  (/camera/front/image_raw)
 OBS_DEPTH = "depth"  # depth image     (/camera/depth/image_raw)
 OBS_LIDAR_SECTORS = "lidar_sectors"  # 8-sector ranges synthesized from depth
 OBS_GOAL = "goal"  # goal-conditioned tasks: [x, y, yaw] or ee target
 
-IMAGE_KEYS = (OBS_IMAGE_FRONT, OBS_IMAGE_WRIST, OBS_IMAGE_BEV)
+# Dataset / recorder cameras: wrist + bird's-eye view.
+IMAGE_KEYS = (OBS_IMAGE_WRIST, OBS_IMAGE_BEV)
 
 # ---------------------------------------------------------------------------
 # Dimensions — mirror data_engine MOBILE_MANIP_*_SPEC (9-D = 6 arm + 3 base)
@@ -55,7 +57,6 @@ MAX_ARM_DELTA_PER_STEP = 0.05  # rad/step at 20 Hz — matches rl_arm_node
 # ---------------------------------------------------------------------------
 LEROBOT_KEY_MAP: Dict[str, str] = {
     OBS_STATE: "observation.state",
-    OBS_IMAGE_FRONT: "observation.images.front",
     OBS_IMAGE_WRIST: "observation.images.wrist",
     OBS_IMAGE_BEV: "observation.images.bev",
 }

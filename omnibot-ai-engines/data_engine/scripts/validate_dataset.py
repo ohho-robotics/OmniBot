@@ -23,6 +23,8 @@ from pathlib import Path
 import click
 import pyarrow.parquet as pq
 
+from data_engine.schema.camera_keys import LEROBOT_IMAGE_KEYS
+
 REQUIRED_META = {
     "codebase_version",
     "fps",
@@ -40,7 +42,7 @@ REQUIRED_PARQUET = {
     "task_index",
     "next.done",
 }
-REQUIRED_CAM_KEYS = {"observation.images.front", "observation.images.wrist"}
+REQUIRED_CAM_KEYS = set(LEROBOT_IMAGE_KEYS)
 CHUNKS_SIZE = 1000
 
 

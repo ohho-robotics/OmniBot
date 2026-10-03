@@ -1,8 +1,8 @@
 # OmniBot 9-DOF mobile manipulation robot specification.
 #
-# Single source of truth for action/state dimensions, joint names, value
-# ranges, and camera keys. All training, recording, and inference code reads
-# from this file — never hardcode these values elsewhere.
+# Single source of truth for action/state dimensions, joint names, and value
+# ranges. Camera keys must match data_engine/schema/camera_keys.py
+# (wrist + bird's-eye view).
 #
 # Joint names use the arm_ prefix matching arm_driver_node and arm_cmd_mux
 # defaults. Do not change without updating those nodes.
@@ -44,8 +44,8 @@ robot:
   state_max:  [ 3.14,  1.57,  1.57,  1.57,  3.14,  0.80,  0.30,  0.30,  1.00]
 
   # ── Cameras ────────────────────────────────────────────────────────────────
-  # key:    LeRobot feature key used in obs dicts, dataset columns, and the
-  #         ROS policy_node. Must match across recording, training, inference.
+  # key:    LeRobot feature key. Must match data_engine/schema/camera_keys.py
+  #         (wrist + bird's-eye view only).
   # topic:  ROS2 topic name (used by policy_node and teleop_recorder_node).
   # width/height: native capture resolution (policy adapters resize internally).
   cameras:

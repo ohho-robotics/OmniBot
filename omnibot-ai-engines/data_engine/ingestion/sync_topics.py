@@ -22,8 +22,8 @@ class TopicSynchronizer:
 
         Args:
             data_streams: {
-                'camera_front': [(ts_ns, img), ...],
                 'camera_wrist': [(ts_ns, img), ...],
+                'camera_bev': [(ts_ns, img), ...],
                 'state': [(ts_ns, state), ...],
                 'action': [(ts_ns, action), ...]
             }

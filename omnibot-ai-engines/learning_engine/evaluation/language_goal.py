@@ -47,8 +47,8 @@ def episode_frames(
     """Pull the best available camera stream from an episode."""
     cameras = camera_priority or [
         schema.OBS_IMAGE_WRIST,
-        schema.OBS_IMAGE_FRONT,
         schema.OBS_IMAGE_BEV,
+        schema.OBS_IMAGE_FRONT,
     ]
     for cam in cameras:
         frames = [s.observation[cam] for s in episode.steps if cam in s.observation]

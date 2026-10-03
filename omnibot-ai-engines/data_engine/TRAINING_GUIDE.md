@@ -77,8 +77,10 @@ ls /dev/ttyACM*        # should see ACM0 (follower) + ACM1 (leader)
 ls /dev/video*         # one device per USB camera (see §1.1 device table)
 
 # Test cameras individually
-ros2 run image_tools showimage --ros-args -r /image:=/camera/front/image_raw
 ros2 run image_tools showimage --ros-args -r /image:=/camera/wrist/image_raw
+ros2 run image_tools showimage --ros-args -r /image:=/camera/base/bev/image_raw
+# Front is a BEV-stitcher input, not a dataset camera:
+ros2 run image_tools showimage --ros-args -r /image:=/camera/front/image_raw
 
 # Verify arm driver is alive
 ros2 topic echo /arm/joint_states --once
@@ -142,9 +144,9 @@ The `teleop_recorder_node` captures at `fps` Hz and stores:
 ```
 state  [9D]: current arm joint angles + base odom velocities
 action [9D]: arm commands sent + base cmd_vel issued this step
-obs/front_image  : 640×480 (CAMERA_FRONT)
-obs/wrist_image  : 640×480 (CAMERA_WRIST)
-timestamp        : ROS time in nanoseconds
+observation.images.wrist : 640×480 (CAMERA_WRIST)
+observation.images.bev   : 800×800 (CAMERA_BEV)
+timestamp                : ROS time in nanoseconds
 ```
 
 Image resolutions come from `data_engine/schema/constants.py` — update that
@@ -217,15 +219,17 @@ python -m data_engine.scripts.ingest_dataset \
       episode_000001.parquet
   videos/
     chunk-000/
-      observation.images.front/
-        episode_000000.mp4
       observation.images.wrist/
+        episode_000000.mp4
+      observation.images.bev/
         episode_000000.mp4
 ```
 
-> The ingestion pipeline (`bag_to_omnibot.py`) writes the **front** and
-> **wrist** camera streams. The BEV stream is consumed live by the inference
-> node but is not currently exported into the training dataset.
+> The ingestion pipeline (`bag_to_omnibot.py`) writes the **wrist** and
+> **bird's-eye view** streams (`observation.images.wrist`,
+> `observation.images.bev`). The physical front camera is an input to the
+> BEV stitcher and is not a dataset feature. Keys live in
+> `schema/camera_keys.py`.
 
 ### 4.5 Validate the Dataset
 

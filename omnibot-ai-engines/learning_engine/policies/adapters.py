@@ -33,7 +33,7 @@ class VlaServePolicy(Policy):
     def __init__(
         self,
         url: str = "http://localhost:8000",
-        image_key: str = schema.OBS_IMAGE_FRONT,
+        image_key: str = schema.OBS_IMAGE_WRIST,
         action_dim: int = 7,
     ) -> None:
         self.url = url.rstrip("/")
@@ -136,7 +136,7 @@ class OpenVLAPolicy(Policy):
         self.action_dim = 7
 
     def predict(self, observation: Observation, task: str = "") -> np.ndarray:
-        image = np.asarray(observation[schema.OBS_IMAGE_FRONT], dtype=np.uint8)
+        image = np.asarray(observation[schema.OBS_IMAGE_WRIST], dtype=np.uint8)
         action = self._model.predict(image=image, instruction=task)
         return np.asarray(action, dtype=np.float32)[: self.action_dim]
 

@@ -109,9 +109,12 @@ Nothing else changes.
 | Key | Shape | Source topic |
 |---|---|---|
 | `state` | (9,) = arm ×6 + base vel ×3 | `/arm/joint_states` + `/odom` |
-| `images.front` | (480, 640, 3) bgr8 | `/camera/front/image_raw` |
 | `images.wrist` | (240, 320, 3) bgr8 | `/camera/wrist/image_raw` |
 | `images.bev` | (H, W, 3) | `/camera/base/bev/image_raw` |
+
+Dataset cameras are wrist and bird's-eye view only (`schema.IMAGE_KEYS`).
+The physical front camera (`/camera/front/image_raw`) is a BEV-stitcher input,
+not a LeRobot feature.
 | `lidar_sectors` | (8,) | synthesized from depth (rl_nav convention) |
 | `goal` | (3,) | goal-conditioned tasks |
 

@@ -65,7 +65,6 @@ def default_observation(with_images: bool = True) -> Dict[str, np.ndarray]:
     obs = {schema.OBS_STATE: np.zeros(schema.MOBILE_MANIP_STATE_DIM, dtype=np.float32)}
     if with_images:
         obs[schema.OBS_IMAGE_WRIST] = np.zeros((240, 320, 3), dtype=np.uint8)
-        obs[schema.OBS_IMAGE_FRONT] = np.zeros((480, 640, 3), dtype=np.uint8)
         obs[schema.OBS_IMAGE_BEV] = np.zeros((240, 320, 3), dtype=np.uint8)
     return obs
 
