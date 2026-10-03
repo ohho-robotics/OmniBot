@@ -31,7 +31,11 @@ rl_arm_node:
 
 arm_cmd_mux:
   ros__parameters:
-    default_mode: "policy"     # Start in policy pass-through mode
+    # Arm source used after /control_mode leaves teleop. The mux still
+    # starts held: policy commands are not forwarded until a human sets
+    # /control_mode to vla, nav2, or rl_nav. mobile_manipulation.launch.py
+    # overrides this key to teleop for the one-launch bring-up.
+    default_mode: "policy"
 
 rl_object_pose_node:
   ros__parameters:

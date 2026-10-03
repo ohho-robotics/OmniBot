@@ -135,7 +135,8 @@ def generate_launch_description():
     # ── Arm Command Mux (always required) ────────────────────────────────────
     # Bridges /arm/joint_commands (SmolVLA / Android) → /arm/joint_commands/out
     # → arm_driver_node. Also routes /arm/joint_commands/rl from rl_arm_node
-    # when use_rl:=true. Started unconditionally so the arm works in every mode.
+    # when use_rl:=true. Started unconditionally. Arm commands stay idle until
+    # /control_mode is vla, nav2, or rl_nav.
     arm_cmd_mux_node = Node(
         package="omnibot_rl",
         executable="arm_cmd_mux",

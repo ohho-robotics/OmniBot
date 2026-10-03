@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from geometry_msgs.msg import Twist
-from std_msgs.msg import String
+from std_msgs.msg import Bool, String
 
 from omnibot_hybrid.cmd_vel_mux import CmdVelMux
 
@@ -46,8 +46,20 @@ def _make_twist(x: float = 1.0) -> Twist:
 
 
 class TestDefaultMode:
-    def test_default_is_nav2(self, mux_node):
-        assert mux_node._active_mode == "nav2"
+    def test_default_is_teleop(self, mux_node):
+        assert mux_node._active_mode == "teleop"
+
+    def test_autonomous_sources_idle_until_mode_changes(self, mux_node):
+        mux_node._nav2_cb(_make_twist(0.5))
+        mux_node._vla_cb(_make_twist(0.6))
+        mux_node._rl_nav_cb(_make_twist(0.7))
+        mux_node._out_pub.publish.assert_not_called()
+
+    def test_teleop_forwarded_by_default(self, mux_node):
+        mux_node._teleop_cb(_make_twist(0.2))
+        mux_node._out_pub.publish.assert_called_once()
+        msg = mux_node._out_pub.publish.call_args[0][0]
+        assert msg.linear.x == pytest.approx(0.2)
 
 
 class TestModeSwitching:
@@ -103,6 +115,37 @@ class TestForwarding:
     def test_teleop_forwarded_in_teleop_mode(self, mux_node):
         mux_node._active_mode = "teleop"
         mux_node._teleop_cb(_make_twist(0.1))
+        mux_node._out_pub.publish.assert_called_once()
+
+
+class TestStopWithinOneCycle:
+    def test_return_to_teleop_zeros_and_blocks_vla(self, mux_node):
+        _set_mode(mux_node, "vla")
+        mux_node._out_pub.reset_mock()
+        _set_mode(mux_node, "teleop")
+        zero = mux_node._out_pub.publish.call_args[0][0]
+        assert zero.linear.x == pytest.approx(0.0)
+        assert zero.angular.z == pytest.approx(0.0)
+        mux_node._out_pub.reset_mock()
+        mux_node._vla_cb(_make_twist(0.9))
+        mux_node._out_pub.publish.assert_not_called()
+        mux_node._teleop_cb(_make_twist(0.2))
+        mux_node._out_pub.publish.assert_called_once()
+
+    def test_emergency_stop_zeros_and_blocks_teleop(self, mux_node):
+        mux_node._out_pub.reset_mock()
+        stop = Bool()
+        stop.data = True
+        mux_node._estop_cb(stop)
+        zero = mux_node._out_pub.publish.call_args[0][0]
+        assert zero.linear.x == pytest.approx(0.0)
+        mux_node._out_pub.reset_mock()
+        mux_node._teleop_cb(_make_twist(0.4))
+        mux_node._out_pub.publish.assert_not_called()
+        clear = Bool()
+        clear.data = False
+        mux_node._estop_cb(clear)
+        mux_node._teleop_cb(_make_twist(0.3))
         mux_node._out_pub.publish.assert_called_once()
 
 

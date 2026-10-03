@@ -24,6 +24,8 @@
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>omnibot_arm</exec_depend>
 
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
   <test_depend>launch_testing_ament_cmake</test_depend>
   <test_depend>geometry_msgs</test_depend>
   <test_depend>nav_msgs</test_depend>

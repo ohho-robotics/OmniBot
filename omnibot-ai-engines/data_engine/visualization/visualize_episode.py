@@ -28,6 +28,8 @@ import cv2
 import numpy as np
 import pandas as pd
 
+from data_engine.schema.constants import LEROBOT_CAMERA_KEYS
+
 CHUNKS_SIZE = 1000
 
 
@@ -110,21 +112,23 @@ def main(dataset: str, episode: int, fps: float) -> None:
     states = df["observation.state"].tolist()
     actions = df["action"].tolist()
 
-    # ── Open video captures ───────────────────────────────────────────────────
-    cap_front = _open_video(root, "observation.images.front", ep_idx)
-    cap_wrist = _open_video(root, "observation.images.wrist", ep_idx)
+    # ── Open video captures (wrist, then bird's-eye view) ────────────────────
+    captures: list[tuple[str, cv2.VideoCapture]] = []
+    for key, cam in LEROBOT_CAMERA_KEYS.items():
+        cap = _open_video(root, key, ep_idx)
+        if cap is None:
+            continue
+        title = (
+            "Bird's-eye view"
+            if cam.name == "bev"
+            else f"{cam.name.capitalize()} camera"
+        )
+        cv2.namedWindow(title, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(title, cam.width, cam.height)
+        captures.append((title, cap))
 
-    if cap_front is None and cap_wrist is None:
+    if not captures:
         click.echo("[WARN] No video files found — showing state/action text only.")
-
-    win_front = "Front camera"
-    win_wrist = "Wrist camera"
-    if cap_front:
-        cv2.namedWindow(win_front, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(win_front, 640, 480)
-    if cap_wrist:
-        cv2.namedWindow(win_wrist, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(win_wrist, 320, 240)
 
     click.echo("Controls: SPACE=pause/resume  n=step  q=quit")
 
@@ -153,16 +157,13 @@ def main(dataset: str, episode: int, fps: float) -> None:
             f"Task: {task_name[:60]}",
         ]
 
-        if cap_front:
-            ret, frame = cap_front.read()
-            if ret:
+        for i, (title, cap) in enumerate(captures):
+            ret, frame = cap.read()
+            if not ret:
+                continue
+            if i == 0:
                 _overlay(frame, overlay_lines)
-                cv2.imshow(win_front, frame)
-
-        if cap_wrist:
-            ret, frame = cap_wrist.read()
-            if ret:
-                cv2.imshow(win_wrist, frame)
+            cv2.imshow(title, frame)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):
@@ -180,10 +181,8 @@ def main(dataset: str, episode: int, fps: float) -> None:
             if wait > 0:
                 time.sleep(wait)
 
-    if cap_front:
-        cap_front.release()
-    if cap_wrist:
-        cap_wrist.release()
+    for _, cap in captures:
+        cap.release()
     cv2.destroyAllWindows()
     click.echo("Done.")
 
