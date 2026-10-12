@@ -190,8 +190,15 @@ class TestTeleopPreemptsAutonomy:
 
     def test_switching_to_teleop_stops_autonomous_feed(self, mux_node):
         _set_mode(mux_node, "nav2")
+        mux_node._out_pub.publish.assert_called_once()
+        zero = mux_node._out_pub.publish.call_args[0][0]
+        assert zero.linear.x == pytest.approx(0.0)
+        assert zero.angular.z == pytest.approx(0.0)
+        mux_node._out_pub.reset_mock()
         mux_node._nav2_cb(_make_twist(0.5))
         mux_node._out_pub.publish.assert_called_once()
+        msg = mux_node._out_pub.publish.call_args[0][0]
+        assert msg.linear.x == pytest.approx(0.5)
         mux_node._out_pub.reset_mock()
         _set_mode(mux_node, "teleop")
         mux_node._nav2_cb(_make_twist(0.5))
