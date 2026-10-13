@@ -1,0 +1,89 @@
+# Proof v0 scenario regression suite — headless Gazebo + Nav2 only.
+# Each entry is one run: explicit start, goal, and one extra static obstacle (box).
+# Poses are in the `map` frame (same as the Gazebo world in apartment.sdf).
+# See maps/README.md and config/waypoints.yaml for the three named goals.
+
+version: 1
+frame_id: map
+world: apartment
+
+scenarios:
+  - id: origin_to_kitchen
+    start: {x: 0.0, y: 0.0, yaw_deg: 0.0}
+    goal: {x: -1.9, y: 0.7, yaw_deg: 180.0}
+    obstacle:
+      name: mid_corridor_box
+      pose: {x: -0.85, y: 0.25, yaw_deg: 0.0}
+      size: {x: 0.28, y: 0.55, z: 0.45}
+
+  - id: origin_to_desk
+    start: {x: 0.0, y: 0.0, yaw_deg: 0.0}
+    goal: {x: 2.55, y: -0.45, yaw_deg: 90.0}
+    obstacle:
+      name: east_approach_box
+      pose: {x: 1.35, y: -0.15, yaw_deg: 15.0}
+      size: {x: 0.30, y: 0.40, z: 0.45}
+
+  - id: origin_to_door
+    start: {x: 0.0, y: 0.0, yaw_deg: 0.0}
+    goal: {x: -0.3, y: -1.45, yaw_deg: -90.0}
+    obstacle:
+      name: south_hall_box
+      pose: {x: -0.05, y: -0.75, yaw_deg: 0.0}
+      size: {x: 0.35, y: 0.30, z: 0.45}
+
+  - id: north_to_kitchen
+    start: {x: 0.0, y: 1.55, yaw_deg: -90.0}
+    goal: {x: -1.9, y: 0.7, yaw_deg: 180.0}
+    obstacle:
+      name: north_corridor_box
+      pose: {x: -0.55, y: 1.05, yaw_deg: 0.0}
+      size: {x: 0.28, y: 0.50, z: 0.45}
+
+  - id: west_mid_to_door
+    start: {x: -1.8, y: 0.0, yaw_deg: 90.0}
+    goal: {x: -0.3, y: -1.45, yaw_deg: -90.0}
+    obstacle:
+      name: west_to_south_box
+      pose: {x: -1.05, y: -0.85, yaw_deg: 0.0}
+      size: {x: 0.32, y: 0.38, z: 0.45}
+
+  - id: east_mid_to_desk
+    start: {x: 2.9, y: -0.5, yaw_deg: 180.0}
+    goal: {x: 2.55, y: -0.45, yaw_deg: 90.0}
+    obstacle:
+      name: desk_entry_box
+      pose: {x: 2.75, y: -0.05, yaw_deg: 0.0}
+      size: {x: 0.25, y: 0.35, z: 0.45}
+
+  - id: south_to_kitchen
+    start: {x: 0.0, y: -1.0, yaw_deg: 90.0}
+    goal: {x: -1.9, y: 0.7, yaw_deg: 180.0}
+    obstacle:
+      name: south_west_box
+      pose: {x: -1.05, y: 0.15, yaw_deg: 0.0}
+      size: {x: 0.30, y: 0.42, z: 0.45}
+
+  - id: center_to_desk
+    start: {x: 0.5, y: 0.5, yaw_deg: 0.0}
+    goal: {x: 2.55, y: -0.45, yaw_deg: 90.0}
+    obstacle:
+      name: center_east_box
+      pose: {x: 1.55, y: 0.15, yaw_deg: 0.0}
+      size: {x: 0.28, y: 0.48, z: 0.45}
+
+  - id: north_to_desk
+    start: {x: 0.0, y: 1.7, yaw_deg: 180.0}
+    goal: {x: 2.55, y: -0.45, yaw_deg: 90.0}
+    obstacle:
+      name: north_east_box
+      pose: {x: 1.05, y: 0.55, yaw_deg: 0.0}
+      size: {x: 0.30, y: 0.40, z: 0.45}
+
+  - id: southwest_to_kitchen
+    start: {x: -1.4, y: -1.4, yaw_deg: 45.0}
+    goal: {x: -1.9, y: 0.7, yaw_deg: 180.0}
+    obstacle:
+      name: sw_corner_box
+      pose: {x: -1.55, y: -0.35, yaw_deg: 0.0}
+      size: {x: 0.28, y: 0.45, z: 0.45}

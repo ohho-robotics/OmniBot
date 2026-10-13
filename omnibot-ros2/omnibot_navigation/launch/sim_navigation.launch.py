@@ -58,6 +58,9 @@ def _launch(context, *args, **kwargs):
             # startup timeout, so it is not offered here.
             "drive": "planar",
             "rosbridge": "false",
+            "spawn_x": LaunchConfiguration("initial_x"),
+            "spawn_y": LaunchConfiguration("initial_y"),
+            "spawn_yaw": LaunchConfiguration("initial_yaw"),
         }.items(),
     )
 
