@@ -1,17 +1,21 @@
-# OmniBot VLA Engine
+# OmniVLA engine (`vla_engine`)
 
-The **offline** training and inference stack for the Vision-Language-Action
-(OpenVLA / SmolVLA) models. Pure PyTorch + a FastAPI inference server, no ROS
+The **offline** training and inference stack for Vision-Language-Action
+(OpenVLA / SmolVLA) models. Pure PyTorch plus a FastAPI inference server; no ROS
 dependency.
+
+PyPI distribution name (when published): **`omnibot-vla-engine`**. Import as
+`vla_engine`.
 
 ## Distinction
 
-- **`vla_engine/` (this folder)**: model wrappers, a FastAPI inference server,
-  and TensorRT export tooling. Independent of ROS.
+- **`vla_engine/` (this folder)**: OmniVLA engine — model wrappers, a FastAPI
+  inference server, and TensorRT export tooling. Independent of ROS.
 - **`robot_ws/src/omnibot_vla/`**: the ROS 2 node that wraps OpenVLA for
   real-time robot control.
-- See also `packages/vla_serve/` — a thin, separately-packaged FastAPI server
-  with the same `/health` `/load_model` `/predict` contract.
+- **`vla_serve`**: a thin FastAPI server with the same `/health`, `/load_model`,
+  and `/predict` contract (packaged separately in the OhhO SDK / `ohho-os` tree;
+  not vendored in this repo).
 
 ## Layout
 
@@ -32,8 +36,23 @@ vla_engine/
 
 ## Setup
 
+Editable install (recommended):
+
 ```bash
-pip install -r requirements.txt
+pip install -e "omnibot-ai-engines/vla_engine[serve,gpu]"
+```
+
+CPU-only inference dependencies (no weights download):
+
+```bash
+pip install -e "omnibot-ai-engines/vla_engine[serve,gpu]" \
+  --extra-index-url https://download.pytorch.org/whl/cpu
+```
+
+Legacy one-shot install from `requirements.txt` (same stacks, no packaging):
+
+```bash
+pip install -r omnibot-ai-engines/vla_engine/requirements.txt
 ```
 
 ## Inference server
@@ -95,8 +114,20 @@ engine is consumed by `policy_node` in `omnibot_lerobot` via `use_trt: true`.
 
 ## Tests
 
+After `pip install -e "omnibot-ai-engines/vla_engine[serve,gpu,test]"`:
+
 ```bash
-cd vla_engine && pytest tests/
+pytest omnibot-ai-engines/vla_engine/tests/
 ```
 
-The test suite is skipped automatically when `torch` is not installed.
+CI runs the same suite in the `vla-engine` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+(CPU PyTorch, mocked model). Tests are skipped when `torch` is not installed.
+
+## Distribution (TODO — OHH-55)
+
+**Not published in this change.** Varun to decide:
+
+1. Publish **`omnibot-vla-engine`** on PyPI (optional console alias `vla-serve`), or
+2. Fold the server stack into **`ohho-os[serve]`** on PyPI and keep this folder as the source tree only.
+
+Until then, use editable install from this repo.
