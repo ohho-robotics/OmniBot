@@ -171,6 +171,8 @@ These are the parts referenced in this repo's code and docs. Prices are not yet 
 
 ## Architecture
 
+Full system diagram, launch graph, launch-derived topics table, and [known limitations](docs/architecture.md#known-limitations): **[docs/architecture.md](docs/architecture.md)**.
+
 ```mermaid
 flowchart LR
   subgraph Inputs
