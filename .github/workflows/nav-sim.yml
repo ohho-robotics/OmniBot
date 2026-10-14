@@ -58,8 +58,18 @@ jobs:
           rosdep update
           source /opt/ros/jazzy/setup.bash
           # The 3-D mapping stack (RTAB-Map, OctoMap) is not used in this sim.
+          # omnibot_hybrid and omnibot_rl are workspace packages declared as
+          # exec_depend by omnibot_bringup. They are not rosdep keys; listing
+          # them here lets --ignore-src skip them. Nav scenarios leave vr off,
+          # so they are not built or launched.
           rosdep install \
-            --from-paths src/omnibot_description src/omnibot_arm src/omnibot_bringup src/omnibot_navigation \
+            --from-paths \
+              src/omnibot_description \
+              src/omnibot_arm \
+              src/omnibot_bringup \
+              src/omnibot_navigation \
+              src/omnibot_hybrid \
+              src/omnibot_rl \
             --ignore-src -y --rosdistro jazzy \
             --skip-keys "rtabmap_ros octomap_server pcl_ros octomap_msgs"
       - name: Build

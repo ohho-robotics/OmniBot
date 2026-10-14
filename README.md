@@ -74,13 +74,14 @@ colcon test --base-paths src --event-handlers console_direct+ --return-code-on-t
 colcon test-result --verbose
 ```
 
-Then start the Gazebo sim with `ros2 launch omnibot_bringup sim.launch.py world:=flat`. See [docs/reference.md](docs/reference.md) for worlds, bridged topics and browser teleop.
+Then start the Gazebo sim with `ros2 launch omnibot_bringup sim.launch.py world:=flat`. The VR profile is `ros2 launch omnibot_bringup sim_vr.launch.py` (apartment world, muxes, e-stop, rosbridge on 127.0.0.1, MJPEG). Topic contract: [docs/vr.md](docs/vr.md). See [docs/reference.md](docs/reference.md) for worlds, bridged topics and browser teleop.
 
 On the physical robot (docs-test skips this):
 
 <!-- docs-test: skip hardware -->
 ```bash
 ros2 launch omnibot_bringup robot_with_joy.launch.py
+ros2 launch omnibot_bringup robot_vr.launch.py
 ros2 launch omnibot_bringup perception.launch.py
 ros2 launch omnibot_arm arm.launch.py
 ros2 launch omnibot_lerobot teleop_record.launch.py

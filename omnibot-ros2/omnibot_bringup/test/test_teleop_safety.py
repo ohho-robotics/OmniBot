@@ -298,6 +298,12 @@ def test_launch_files_wire_teleop_safety():
     assert 'ros_topic_name: "/cmd_vel/out"' in vr_bridge
     assert 'ros_topic_name: "/cmd_vel"' not in vr_bridge
     assert 'ros_topic_name: "/cmd_vel"' in flat_bridge
+    sim_vr = (BRINGUP / "launch" / "sim_vr.launch.py").read_text(encoding="utf-8")
+    assert "sim.launch.py" in sim_vr
+    assert '"vr": "true"' in sim_vr
+    robot_vr = (BRINGUP / "launch" / "robot_vr_support.py").read_text(encoding="utf-8")
+    assert "teleop_safety.launch.py" in robot_vr
+    assert 'parameters=[{"default_mode": "teleop", "use_sim_time": False}]' in robot_vr
     assert "declare_parameter" not in GATE_SRC.read_text(encoding="utf-8")
 
 
