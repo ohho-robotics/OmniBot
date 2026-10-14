@@ -22,15 +22,19 @@ jobs:
             -e omnibot-ai-engines/learning_engine \
             -e omnibot-ai-engines/agent_engine \
             -e yahboom-python-driver \
-            pytest numpy pyarrow click pyyaml ruff
+            pytest numpy pyarrow click pyyaml ruff coverage
       - name: Ruff
         run: ruff check .
-      - name: CPU suites
-        run: |
-          pytest mecanum-kinematics/tests yahboom-python-driver/tests ros2-bev-stitcher/tests omnibot-ros2/omnibot_arm/test omnibot-ai-ros2/omnibot_lerobot/test omnibot-ros2/omnibot_bringup/test/test_unbuilt_launch.py omnibot-ros2/omnibot_bringup/test/test_teleop_default.py omnibot-ros2/omnibot_navigation/test -q
-          python -m unittest discover -s omnibot-ai-engines/learning_engine/tests -t omnibot-ai-engines
-          python -m unittest discover -s omnibot-ai-engines/agent_engine/tests -t omnibot-ai-engines
-          PYTHONPATH=omnibot-ai-engines pytest omnibot-ai-engines/data_engine/tests -q
+      - name: CPU suites and line coverage
+        run: python scripts/run_cpu_coverage.py
+      - name: Upload CPU coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cpu-coverage
+          path: |
+            coverage/coverage-summary.txt
+            coverage/cpu-coverage.json
 
   docs:
     name: README docs-as-tests
