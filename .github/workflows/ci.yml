@@ -31,6 +31,7 @@ jobs:
           python -m unittest discover -s omnibot-ai-engines/learning_engine/tests -t omnibot-ai-engines
           python -m unittest discover -s omnibot-ai-engines/agent_engine/tests -t omnibot-ai-engines
           PYTHONPATH=omnibot-ai-engines pytest omnibot-ai-engines/data_engine/tests -q
+          PYTHONPATH=omnibot-ai-engines pytest omnibot-ai-engines/lerobot_engine/tests -q
 
   docs:
     name: README docs-as-tests
