@@ -301,6 +301,29 @@ def test_launch_files_wire_teleop_safety():
     assert "declare_parameter" not in GATE_SRC.read_text(encoding="utf-8")
 
 
+def test_sim_launch_nodes_install_into_package_libexec():
+    """Launch resolves executables in lib/<package>, which symlink installs miss."""
+    hybrid_cfg = (HYBRID_ROOT / "setup.cfg").read_text(encoding="utf-8")
+    rl_root = REPO / "omnibot-ai-ros2" / "omnibot_rl"
+    rl_cfg = (rl_root / "setup.cfg").read_text(encoding="utf-8")
+    assert "script_dir=$base/lib/omnibot_hybrid" in hybrid_cfg
+    assert "install_scripts=$base/lib/omnibot_hybrid" in hybrid_cfg
+    assert "script_dir=$base/lib/omnibot_rl" in rl_cfg
+    assert "install_scripts=$base/lib/omnibot_rl" in rl_cfg
+    hybrid_setup = (HYBRID_ROOT / "setup.py").read_text(encoding="utf-8")
+    rl_setup = (rl_root / "setup.py").read_text(encoding="utf-8")
+    assert "teleop_safety = omnibot_hybrid.teleop_safety:main" in hybrid_setup
+    assert "cmd_vel_mux = omnibot_hybrid.cmd_vel_mux:main" in hybrid_setup
+    assert "arm_cmd_mux        = omnibot_rl.arm_cmd_mux:main" in rl_setup
+
+
+def test_teleop_safety_imports_set_parameters_result_from_rcl_interfaces():
+    """Jazzy rclpy.parameter does not export SetParametersResult."""
+    source = NODE_SRC.read_text(encoding="utf-8")
+    assert "from rcl_interfaces.msg import SetParametersResult" in source
+    assert "from rclpy.parameter import SetParametersResult" not in source
+
+
 def _run_stubbed(script):
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(
@@ -335,14 +358,16 @@ def test_node_wiring_latch_and_service_without_ros(tmp_path):
         clock_mod = _pkg("rclpy.clock")
         clock_mod.Clock = lambda *a, **k: None
         clock_mod.ClockType = SimpleNamespace(STEADY_TIME=0)
-        param_mod = _pkg("rclpy.parameter")
+        rcl_interfaces = _pkg("rcl_interfaces")
+        interfaces_msg = _pkg("rcl_interfaces.msg")
+        rcl_interfaces.msg = interfaces_msg
 
         class SetParametersResult:
             def __init__(self, successful=True, reason=""):
                 self.successful = successful
                 self.reason = reason
 
-        param_mod.SetParametersResult = SetParametersResult
+        interfaces_msg.SetParametersResult = SetParametersResult
         qos = _pkg("rclpy.qos")
         qos.QoSProfile = lambda *a, **k: None
         qos.DurabilityPolicy = SimpleNamespace(TRANSIENT_LOCAL=1)
