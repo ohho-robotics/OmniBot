@@ -47,7 +47,8 @@ class SystemInfo:
         slug = "".join(c if c.isalnum() else "-" for c in name).strip("-")
         while "--" in slug:
             slug = slug.replace("--", "-")
-        return f"{slug[:24]}-{self.torch_device}"
+        slug = slug[:24].rstrip("-")
+        return f"{slug}-{self.torch_device}"
 
 
 def _cpu_model() -> str:

@@ -50,6 +50,37 @@ ohho doctor
 ohho sim --robot omnibot --seconds 2
 ```
 
+## Simulation Demo in Docker (OHH-33)
+
+OmniBot provides a self-contained, CPU-only simulation demo published to GHCR (`ghcr.io/ohho-robotics/omnibot-sim:latest`). You can run Gazebo Harmonic, Nav2 autonomous navigation, and Foxglove Studio browser visualisation without installing ROS 2 Jazzy or Gazebo on your host machine.
+
+### Run with Docker Compose
+
+From the repository root:
+
+<!-- docs-test: skip ros -->
+```bash
+docker compose up sim
+```
+
+This brings up:
+- **`sim`**: Headless Gazebo Harmonic in the apartment environment, `nav2_map_server` with the checked-in map, AMCL localization, Nav2 path planning, and autonomous navigation to the `kitchen` waypoint (`sim_navigation.launch.py autonavigate:=true`).
+- **`foxglove`**: `foxglove_bridge` WebSocket service listening on `ws://localhost:8765`.
+
+### Visualise in Foxglove Studio
+
+1. Open [Foxglove Studio](https://app.foxglove.dev) in your browser (or use the desktop app).
+2. Select **Open connection** and connect to `ws://localhost:8765`.
+3. Import the checked-in layout: [`omnibot-digital-twin/configs/foxglove/omnibot_layout.json`](omnibot-digital-twin/configs/foxglove/omnibot_layout.json).
+4. Watch the robot autonomously plan and drive to its destination in real time.
+
+### VS Code DevContainer
+
+Open this repository in VS Code with the Dev Containers extension installed and select **Reopen in Container** ([`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json)).
+
+> [!NOTE]
+> Acceptance check on a fresh Ubuntu machine with Docker within 10 minutes: TODO (left for Varun to verify on clean host hardware).
+
 ## Build the ROS 2 workspace
 
 Ubuntu 24.04 with ROS 2 Jazzy already installed. The symlinks in [`src/`](src/) are the colcon workspace. The `ros` CI job runs this block on `ros:jazzy-ros-base-noble`.
