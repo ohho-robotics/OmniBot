@@ -38,6 +38,9 @@
   <exec_depend>foxglove_bridge</exec_depend>
   <!-- Android app / web WebSocket bridge — ws://localhost:9090 -->
   <exec_depend>rosbridge_server</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
 
   <!-- <test_depend>ament_lint_auto</test_depend> -->
   <!-- <test_depend>ament_lint_common</test_depend> -->
