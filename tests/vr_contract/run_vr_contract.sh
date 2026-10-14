@@ -8,10 +8,14 @@ mkdir -p "$OUT"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# Jazzy setup.bash reads AMENT_TRACE_SETUP_FILES, which is unset. nounset
+# aborts this script before Gazebo starts (OHH-21).
+set +u
 # shellcheck disable=SC1091
 source /opt/ros/jazzy/setup.bash
 # shellcheck disable=SC1091
 source install/setup.bash
+set -u
 
 # symlink-install executes this file directly; the bit must be set in CI.
 chmod +x omnibot-ros2/omnibot_arm/scripts/arm_joint_state_mirror.py || true

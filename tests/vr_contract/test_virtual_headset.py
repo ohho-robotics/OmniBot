@@ -282,6 +282,11 @@ def test_bridge_yaml_feeds_gazebo_from_the_mux_output():
 def test_runner_and_mirror_stay_on_the_mux_path():
     runner = (ROOT / "tests/vr_contract/run_vr_contract.sh").read_text(encoding="utf-8")
     assert "sim_vr.launch.py" in runner
+    # set -u makes Jazzy setup.bash fail on unset AMENT_TRACE_SETUP_FILES.
+    nounset_off = runner.index("set +u")
+    ros_setup = runner.index("source /opt/ros/jazzy/setup.bash")
+    nounset_on = runner.index("set -u", nounset_off)
+    assert nounset_off < ros_setup < nounset_on
     assert "world:=flat" in runner
     assert "arm:=true" in runner
     assert "video:=false" in runner
