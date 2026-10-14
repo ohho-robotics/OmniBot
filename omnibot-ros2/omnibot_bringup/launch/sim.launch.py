@@ -18,6 +18,11 @@ bound to 127.0.0.1 so a browser on this machine can drive this stack.
 The sim-smoke test passes `rosbridge:=false` and does not start rosbridge.
 This launch does not start foxglove or the arm driver.
 
+`vr:=true` is the sim VR profile. It starts teleop_safety, cmd_vel_mux, and
+arm_cmd_mux, and bridges Gazebo's /cmd_vel from /cmd_vel/out. Clients publish
+/cmd_vel/teleop_raw and /arm/joint_commands/teleop_raw. The default `vr:=false`
+path is unchanged and still drives Gazebo on /cmd_vel.
+
 `drive:=mecanum` selects the gz-sim MecanumDrive plugin instead of planar move.
 `gui:=true` opens the Gazebo client; the default is server-only so CI has no display.
 """
@@ -64,9 +69,15 @@ def _launch_sim(context, *args, **kwargs):
     description = FindPackageShare("omnibot_description").perform(context)
     ros_gz_sim = FindPackageShare("ros_gz_sim").perform(context)
 
+    vr = LaunchConfiguration("vr").perform(context).lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     world_path = _world_path(bringup, world_key)
     xacro_file = os.path.join(description, "urdf", "omnibot.urdf.xacro")
-    bridge_config = os.path.join(bringup, "config", "sim_bridge.yaml")
+    bridge_name = "sim_bridge_vr.yaml" if vr else "sim_bridge.yaml"
+    bridge_config = os.path.join(bringup, "config", bridge_name)
 
     robot_desc = ParameterValue(
         Command(
@@ -150,6 +161,33 @@ def _launch_sim(context, *args, **kwargs):
                 parameters=[{"port": 9090, "address": address}],
             )
         )
+    if vr:
+        hybrid = FindPackageShare("omnibot_hybrid").perform(context)
+        actions.append(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(hybrid, "launch", "teleop_safety.launch.py")
+                )
+            )
+        )
+        actions.append(
+            Node(
+                package="omnibot_hybrid",
+                executable="cmd_vel_mux",
+                name="cmd_vel_mux",
+                output="screen",
+                parameters=[{"default_mode": "teleop", "use_sim_time": False}],
+            )
+        )
+        actions.append(
+            Node(
+                package="omnibot_rl",
+                executable="arm_cmd_mux",
+                name="arm_cmd_mux",
+                output="screen",
+                parameters=[{"default_mode": "teleop", "use_sim_time": False}],
+            )
+        )
     return actions
 
 
@@ -178,6 +216,16 @@ def generate_launch_description():
                     "Start rosbridge_websocket on port 9090, bound to "
                     "rosbridge_address (127.0.0.1 by default). "
                     "The sim-smoke test sets this false."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "vr",
+                default_value="false",
+                description=(
+                    "Sim VR profile. Start teleop_safety plus the base and arm "
+                    "muxes, and drive Gazebo from /cmd_vel/out. Clients publish "
+                    "/cmd_vel/teleop_raw and /arm/joint_commands/teleop_raw. "
+                    "Default false keeps the /cmd_vel smoke-test path."
                 ),
             ),
             DeclareLaunchArgument(
