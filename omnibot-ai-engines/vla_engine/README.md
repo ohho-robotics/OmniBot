@@ -123,11 +123,29 @@ pytest omnibot-ai-engines/vla_engine/tests/
 CI runs the same suite in the `vla-engine` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 (CPU PyTorch, mocked model). Tests are skipped when `torch` is not installed.
 
-## Distribution (TODO — OHH-55)
+## Distribution
 
-**Not published in this change.** Varun to decide:
+This tree is packaged with **setuptools** via [`pyproject.toml`](pyproject.toml) in this
+directory. The PyPI project name is **`omnibot-vla-engine`** (version `0.1.0`); Python
+imports use the **`vla_engine`** package namespace (`package-dir` maps the repo folder
+onto that name).
 
-1. Publish **`omnibot-vla-engine`** on PyPI (optional console alias `vla-serve`), or
-2. Fold the server stack into **`ohho-os[serve]`** on PyPI and keep this folder as the source tree only.
+| Extra | Purpose |
+|---|---|
+| *(core)* | `numpy`, `Pillow` |
+| `serve` | FastAPI inference server (`fastapi`, `uvicorn`, `pydantic`, `httpx`) |
+| `gpu` | Model weights stack (`torch`, `transformers`, `accelerate`, `bitsandbytes`) |
+| `test` | `pytest` |
 
-Until then, use editable install from this repo.
+**Install from this repo** (not published to PyPI yet):
+
+```bash
+pip install -e "omnibot-ai-engines/vla_engine[serve,gpu,test]"
+```
+
+For CPU-only PyTorch, add `--extra-index-url https://download.pytorch.org/whl/cpu` as in
+[Setup](#setup) above.
+
+**CI:** GitHub Actions job `vla-engine` in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+installs CPU `torch`, then `pip install -e "omnibot-ai-engines/vla_engine[serve,test]"` and
+runs `pytest omnibot-ai-engines/vla_engine/tests`.
