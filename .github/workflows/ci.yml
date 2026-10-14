@@ -42,6 +42,8 @@ jobs:
           python-version: "3.12"
       - name: CPU-only README fences in a fresh venv
         run: python3 scripts/docs_test_readme.py
+      - name: VR profile release notes stay unpublished
+        run: python3 scripts/check_vr_profile_release_notes.py
 
   ros:
     name: colcon build and test
