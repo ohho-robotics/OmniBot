@@ -23,6 +23,12 @@ arm_cmd_mux, and bridges Gazebo's /cmd_vel from /cmd_vel/out. Clients publish
 /cmd_vel/teleop_raw and /arm/joint_commands/teleop_raw. The default `vr:=false`
 path is unchanged and still drives Gazebo on /cmd_vel.
 
+`record_vr_session:=true` is opt-in and only applies with `vr:=true`. It includes
+omnibot_hybrid/launch/vr_session_recorder.launch.py, which records the VR
+session topics to MCAP. The default is false, so sim-smoke does not record.
+OHH-198 sim_vr.launch.py should forward `record_vr_session` into this file
+and should not include the recorder launch itself.
+
 `drive:=mecanum` selects the gz-sim MecanumDrive plugin instead of planar move.
 `gui:=true` opens the Gazebo client; the default is server-only so CI has no display.
 """
@@ -30,7 +36,13 @@ path is unchanged and still drives Gazebo on /cmd_vel.
 import os
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    LogInfo,
+    OpaqueFunction,
+    TimerAction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
@@ -70,6 +82,11 @@ def _launch_sim(context, *args, **kwargs):
     ros_gz_sim = FindPackageShare("ros_gz_sim").perform(context)
 
     vr = LaunchConfiguration("vr").perform(context).lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    record_vr_session = LaunchConfiguration("record_vr_session").perform(context).lower() in (
         "1",
         "true",
         "yes",
@@ -188,6 +205,23 @@ def _launch_sim(context, *args, **kwargs):
                 parameters=[{"default_mode": "teleop", "use_sim_time": False}],
             )
         )
+        if record_vr_session:
+            actions.append(
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        os.path.join(hybrid, "launch", "vr_session_recorder.launch.py")
+                    )
+                )
+            )
+    elif record_vr_session:
+        actions.append(
+            LogInfo(
+                msg=(
+                    "record_vr_session is ignored unless vr:=true. "
+                    "Not recording."
+                )
+            )
+        )
     return actions
 
 
@@ -226,6 +260,17 @@ def generate_launch_description():
                     "muxes, and drive Gazebo from /cmd_vel/out. Clients publish "
                     "/cmd_vel/teleop_raw and /arm/joint_commands/teleop_raw. "
                     "Default false keeps the /cmd_vel smoke-test path."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "record_vr_session",
+                default_value="false",
+                description=(
+                    "With vr:=true, record the VR session topics to MCAP "
+                    "(teleop commands, heartbeat, telemetry, safety state, "
+                    "control mode) with file rotation and a size cap. "
+                    "Default false records nothing. OHH-198 sim_vr.launch.py "
+                    "should forward this argument into sim.launch.py."
                 ),
             ),
             DeclareLaunchArgument(
