@@ -33,7 +33,7 @@ if(BUILD_TESTING)
     find_package(launch_testing_ament_cmake REQUIRED)
     add_launch_test(
       test/test_sim_launch.py
-      TIMEOUT 240
+      TIMEOUT 420
     )
   endif()
 endif()

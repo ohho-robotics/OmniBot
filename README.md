@@ -74,7 +74,7 @@ colcon test --base-paths src --event-handlers console_direct+ --return-code-on-t
 colcon test-result --verbose
 ```
 
-Then start the Gazebo sim with `ros2 launch omnibot_bringup sim.launch.py world:=flat`. See [docs/reference.md](docs/reference.md) for worlds, bridged topics and browser teleop.
+Then start the Gazebo sim with `ros2 launch omnibot_bringup sim.launch.py world:=flat`. That launch also drives the SO-101 arm, including the gripper, through `arm_sim_driver` using the joint limits and safety rules in [`omnibot_arm/config/arm_params.yaml`](omnibot-ros2/omnibot_arm/config/arm_params.yaml). See [docs/reference.md](docs/reference.md) for worlds, bridged topics and browser teleop.
 
 On the physical robot (docs-test skips this):
 
