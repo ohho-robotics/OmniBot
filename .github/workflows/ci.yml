@@ -68,10 +68,15 @@ jobs:
             --dependency-types=buildtool_export \
             --dependency-types=exec \
             --dependency-types=test
+          # Jazzy ships NumPy 1.26. Current pyarrow needs NumPy 2; 18.1.0 is the pin
+          # the lerobot README uses for that NumPy.
+          # data_engine is not installed here (its setup.py pulls torch). The
+          # lerobot test shells out to validate_dataset and filter_episodes,
+          # which import click. The CPU job installs that extra the same way.
           python3 -m pip install --break-system-packages \
             -e omnibot-ai-engines/learning_engine \
             -e omnibot-ai-engines/agent_engine \
-            numpy
+            numpy pyarrow==18.1.0 click
           colcon build --symlink-install --base-paths src
           source install/setup.bash
           colcon test --base-paths src --event-handlers console_direct+ --return-code-on-test-failure
