@@ -71,6 +71,12 @@ pip install -r omnibot-ai-engines/vla_engine/requirements.txt
 pip install -r omnibot-ai-engines/rl_engine/requirements.txt
 ```
 
+## Quest to a WSL2 sim on Windows (OHH-205)
+
+A Quest on Wi-Fi reaches rosbridge and `web_video_server` on the Windows LAN address. Docker inside WSL2 is behind NAT until mirrored networking or a TCP portproxy is in place. The choice is a Varun TODO. The script and the troubleshooting notes are [vr-sim-network-windows.md](vr-sim-network-windows.md) and [`scripts/windows/vr-sim-network.ps1`](../scripts/windows/vr-sim-network.ps1). `-WhatIf` prints the LAN IP, pairing code, and QR code and leaves the firewall, portproxy, and `.wslconfig` alone.
+
+`sim.launch.py` binds rosbridge to `127.0.0.1` and does not start `web_video_server`. The Quest browser URL is `http://<pc-ip>:8080`. The VR app uses `ws://<pc-ip>:9090`.
+
 ## Bring-up control mode
 
 `mobile_manipulation.launch.py` starts `cmd_vel_mux` and `arm_cmd_mux` in `teleop`. `/cmd_vel/teleop` is forwarded. Nav2, VLA, and RL base commands, and both arm command sources, are not forwarded until `/control_mode` is `vla`, `nav2`, or `rl_nav`. Switching `/control_mode` between any two different modes (teleop→autonomous, autonomous→teleop, or autonomous→autonomous) publishes a zero Twist to stop the base on that callback so the previous source's latched velocity does not run away. Setting `/control_mode` back to `teleop` also stops the autonomous arm stream on that callback and forwards `/cmd_vel/teleop`. Publishing `/emergency_stop` true stops base and arm outputs, including teleop, on that callback. `/arm/joint_commands` is shared by the policy and the Android app, so Android joint commands wait for an autonomous mode as well.
