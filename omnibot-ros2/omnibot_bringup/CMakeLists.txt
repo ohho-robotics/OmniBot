@@ -25,6 +25,10 @@ if(BUILD_TESTING)
     test/test_teleop_default.py
     TIMEOUT 60
   )
+  ament_add_pytest_test(test_pick_place_spawn
+    test/test_pick_place_spawn.py
+    TIMEOUT 60
+  )
 
   # Headless Gazebo launch test. The sim-smoke CI job exports
   # OMNIBOT_SIM_SMOKE=1 before configure. The default colcon test job
@@ -53,6 +57,16 @@ install(DIRECTORY
 # Install world files
 install(DIRECTORY
   worlds
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY
+  models
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY
+  scripts
   DESTINATION share/${PROJECT_NAME}
 )
 

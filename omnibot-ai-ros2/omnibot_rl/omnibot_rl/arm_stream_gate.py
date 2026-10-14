@@ -4,14 +4,16 @@
 until ``/control_mode`` is vla, nav2, or rl_nav. ``/emergency_stop`` blocks
 both arm sources on the same call. ``/arm/joint_commands`` is shared by the
 visuomotor policy and Android teleop, so holding that source in teleop also
-holds Android joint commands. Base teleop is a separate topic and is not
-decided here.
+holds Android joint commands. ``/arm/joint_commands/teleop`` is a separate
+source and is forwarded only while control mode is teleop and the e-stop
+is clear. Base teleop is a separate topic and is not decided here.
 """
 
 DEFAULT_CONTROL_MODE = "teleop"
 VALID_CONTROL_MODES = ("nav2", "vla", "teleop", "rl_nav")
 AUTONOMOUS_CONTROL_MODES = ("nav2", "vla", "rl_nav")
 ARM_SOURCES = ("policy", "rl_arm")
+TELEOP_SOURCE = "teleop"
 _VALID_CONTROL = frozenset(VALID_CONTROL_MODES)
 _ARM_SOURCES = frozenset(ARM_SOURCES)
 
@@ -94,10 +96,19 @@ class ArmStreamGate:
         self.emergency_stop = bool(active)
 
     def allows(self, source):
-        """True when ``source`` may be forwarded on this cycle."""
+        """True when ``source`` may be forwarded on this cycle.
+
+        ``teleop`` is allowed only in teleop mode. Policy and ``rl_arm`` stay
+        held until the control mode is autonomous and they are the selected
+        arm source. Emergency stop blocks every source, including teleop.
+        """
         if self.emergency_stop:
             return False
         if self.control_mode not in _VALID_CONTROL:
+            return False
+        if source == TELEOP_SOURCE:
+            return self.control_mode == "teleop"
+        if source not in _ARM_SOURCES:
             return False
         if self.control_mode not in AUTONOMOUS_CONTROL_MODES:
             return False
