@@ -335,14 +335,15 @@ def test_node_wiring_latch_and_service_without_ros(tmp_path):
         clock_mod = _pkg("rclpy.clock")
         clock_mod.Clock = lambda *a, **k: None
         clock_mod.ClockType = SimpleNamespace(STEADY_TIME=0)
-        param_mod = _pkg("rclpy.parameter")
-
         class SetParametersResult:
             def __init__(self, successful=True, reason=""):
                 self.successful = successful
                 self.reason = reason
 
-        param_mod.SetParametersResult = SetParametersResult
+        interfaces = _pkg("rcl_interfaces")
+        interfaces_msg = _pkg("rcl_interfaces.msg")
+        interfaces.msg = interfaces_msg
+        interfaces_msg.SetParametersResult = SetParametersResult
         qos = _pkg("rclpy.qos")
         qos.QoSProfile = lambda *a, **k: None
         qos.DurabilityPolicy = SimpleNamespace(TRANSIENT_LOCAL=1)
