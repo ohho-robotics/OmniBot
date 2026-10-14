@@ -32,7 +32,7 @@ ros2 launch omnibot_bringup sim.launch.py world:=flat
 
 `world:=apartment` loads a single room with a kitchen (counter, stove, fridge), a desk, and a door. Launch file: [`omnibot-ros2/omnibot_bringup/launch/sim.launch.py`](../omnibot-ros2/omnibot_bringup/launch/sim.launch.py). The mecanum chassis is driven in the plane (`drive:=planar` by default; `drive:=mecanum` selects the MecanumDrive plugin). Sensors in this launch are a 2D lidar, the front RGB camera, and the IMU.
 
-The VR profile is [`sim_vr.launch.py`](../omnibot-ros2/omnibot_bringup/launch/sim_vr.launch.py). It includes this launch with `world:=apartment` and `vr:=true`, so Gazebo follows `/cmd_vel/out`. rosbridge and `web_video_server` bind `127.0.0.1` unless `rosbridge_address` is set with the gateway off. The shared topic contract is [vr.md](vr.md).
+The VR profile is [`sim_vr.launch.py`](../omnibot-ros2/omnibot_bringup/launch/sim_vr.launch.py). It includes this launch with `world:=apartment` and `vr:=true`, so Gazebo follows `/cmd_vel/out`. rosbridge and `web_video_server` bind `127.0.0.1` unless `rosbridge_address` is set with the gateway off. The real-robot command is [`robot_vr.launch.py`](../omnibot-ros2/omnibot_bringup/launch/robot_vr.launch.py). Both load [`vr_topic_contract.yaml`](../omnibot-ros2/omnibot_bringup/config/vr_topic_contract.yaml). The Pi CPU table and the systemd unit are in [vr.md](vr.md). The unit is not enabled by this repo.
 
 `ros_gz_bridge` topics. `rosbridge:=true` (the default) also starts `rosbridge_websocket` on port 9090. The sim-smoke test passes `rosbridge:=false` and does not start rosbridge:
 

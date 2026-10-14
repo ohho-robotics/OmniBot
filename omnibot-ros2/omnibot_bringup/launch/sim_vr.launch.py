@@ -6,6 +6,10 @@
     ros2 launch omnibot_bringup sim_vr.launch.py nav:=true
     ros2 launch omnibot_bringup sim_vr.launch.py world:=flat
 
+The topic list is config/vr_topic_contract.yaml, shared with
+robot_vr.launch.py. This file still uses the same ports, bind, and
+nodes as before.
+
 Includes sim.launch.py with world:=apartment and vr:=true. That starts
 Gazebo, robot_state_publisher, ros_gz_bridge (/cmd_vel/out -> gz /cmd_vel),
 teleop_safety, cmd_vel_mux, and arm_cmd_mux. This file does not start a
@@ -166,7 +170,14 @@ def _launch_vr(context, *args, **kwargs):
     plan = _support.connectivity(gateway, gateway_exists, rosbridge, video)
     address = _support.upstream_address(gateway, gateway_exists, requested_address)
 
-    actions = []
+    actions = [
+        LogInfo(
+            msg=(
+                "VR topic contract video streams: "
+                + ", ".join(_support.video_stream_topics())
+            )
+        )
+    ]
     if plan["use_gateway_launch"]:
         actions.append(
             LogInfo(
