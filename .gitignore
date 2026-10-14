@@ -1,4 +1,6 @@
 .venv/
+coverage/
+.coverage
 build/
 install/
 log/
