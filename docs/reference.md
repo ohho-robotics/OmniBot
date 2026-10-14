@@ -18,6 +18,7 @@ Detailed notes moved from the top-level README. Back to [README](../README.md).
 | Isaac Lab RL | GPU | [rl_engine/README.md](../omnibot-ai-engines/rl_engine/README.md) and [requirements.txt](../omnibot-ai-engines/rl_engine/requirements.txt) (`isaaclab`, `onnxruntime-gpu`) |
 | Android controller | Robot | [omnibot-android/](../omnibot-android/). Building it needs the Android SDK and JDK 17 ([`build.gradle.kts`](../omnibot-android/build.gradle.kts)), which is separate from a desktop GPU. |
 | Quest teleop | Robot | [omnibot-vr/](../omnibot-vr/). Unity **6000.5.2f1** is pinned in [`ProjectSettings/ProjectVersion.txt`](../omnibot-vr/ProjectSettings/ProjectVersion.txt). |
+| ACT GPU fine-tune and 20-trial robot eval (OHH-52) | GPU and robot | [gpu-train-runbook.md](gpu-train-runbook.md) and [results.md](results.md). From the repo root: `python scripts/ohh52_act_train_dry_run.py`. Needs Varun: budget + robot. |
 
 
 ## Gazebo Harmonic simulation
