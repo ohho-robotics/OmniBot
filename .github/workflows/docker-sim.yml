@@ -77,6 +77,8 @@ jobs:
         run: |
           docker compose config
           docker compose -f omnibot-digital-twin/docker/docker-compose.yml config
+          docker compose -f docker-compose.gpu.yml config
+          docker compose -f omnibot-digital-twin/docker/docker-compose.gpu.yml config
 
       - name: Smoke test container
         shell: bash
@@ -93,6 +95,7 @@ jobs:
           ros2 pkg list | grep -E 'omnibot_navigation|omnibot_bringup|omnibot_description|mecanum_drive_ros2'
           echo '=== Checking launch description ==='
           ros2 launch omnibot_navigation sim_navigation.launch.py --show-args
+          ros2 launch omnibot_bringup sim_vr.launch.py --show-args
           echo '=== Checking python imports ==='
           python3 -c "import mecanum_drive_ros2; import yahboom_ros2; import learning_engine; import agent_engine; print('Imports OK')"
           SMOKE

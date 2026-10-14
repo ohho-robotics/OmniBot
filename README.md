@@ -81,6 +81,19 @@ Open this repository in VS Code with the Dev Containers extension installed and 
 > [!NOTE]
 > Acceptance check on a fresh Ubuntu machine with Docker within 10 minutes: TODO (left for Varun to verify on clean host hardware).
 
+### GPU VR profile (RTX 5060 Ti, WSL2)
+
+The CPU compose file above stays on llvmpipe. On a host with the NVIDIA Container Toolkit and a Blackwell driver (CUDA 12.8+ user-mode, such as an RTX 5060 Ti in WSL2), this starts the Quest camera profile. Gazebo stays headless and renders through Ogre2 EGL on the GPU. rosbridge (9090) and web_video_server (8080) are published on 127.0.0.1 only.
+
+<!-- docs-test: skip gpu -->
+```bash
+docker compose -f docker-compose.gpu.yml up sim-vr
+```
+
+That service runs `ros2 launch omnibot_bringup sim_vr.launch.py` with `world:=apartment`, `vr:=true`, and `gui:=false`. It uses the same image as the CPU demo; the GPU compose file turns software rendering off. Do not combine this file with `docker-compose.yml` (that starts a second simulator). CI does not push `ghcr.io/ohho-robotics/omnibot-sim:vr-<sha>`.
+
+On that PC, `nvidia-smi` inside the container and the Gazebo real-time factor in the sim log are still to be recorded.
+
 ## Build the ROS 2 workspace
 
 Ubuntu 24.04 with ROS 2 Jazzy already installed. The symlinks in [`src/`](src/) are the colcon workspace. The `ros` CI job runs this block on `ros:jazzy-ros-base-noble`.
