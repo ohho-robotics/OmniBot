@@ -77,6 +77,7 @@ def test_docker_workflow_exists_and_configured():
     triggers = data.get("on") if "on" in data else data.get(True, {})
     assert "pull_request" in triggers
     assert "push" in triggers
+    assert "main" in triggers["push"]["branches"]
     assert "v*" in triggers["push"]["tags"]
 
     job = data["jobs"]["docker-sim"]
@@ -86,6 +87,20 @@ def test_docker_workflow_exists_and_configured():
     assert any("Build Docker image" in n for n in step_names)
     assert any("Smoke test container" in n for n in step_names)
     assert any("Docker compose" in n for n in step_names)
+
+    login = next(s for s in steps if "GitHub Container Registry" in s.get("name", ""))
+    assert login.get("if") == "github.ref == 'refs/heads/main'"
+
+    build = next(s for s in steps if s.get("name") == "Build Docker image")
+    push_expr = str(build["with"]["push"])
+    assert "github.ref == 'refs/heads/main'" in push_expr
+    assert "github.event_name == 'push'" in push_expr
+
+    smoke = next(s for s in steps if s.get("name") == "Smoke test container")
+    script = smoke["run"]
+    assert "bash -c \"" not in script
+    assert "<<'SMOKE'" in script
+    assert "print('Imports OK')" in script
 
 
 def test_dockerignore_excludes_heavy_artifacts():
