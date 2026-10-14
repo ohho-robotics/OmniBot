@@ -71,7 +71,8 @@ jobs:
           python3 -m pip install --break-system-packages \
             -e omnibot-ai-engines/learning_engine \
             -e omnibot-ai-engines/agent_engine \
-            numpy
+            numpy \
+            'jsonschema>=4.18'
           colcon build --symlink-install --base-paths src
           source install/setup.bash
           colcon test --base-paths src --event-handlers console_direct+ --return-code-on-test-failure
