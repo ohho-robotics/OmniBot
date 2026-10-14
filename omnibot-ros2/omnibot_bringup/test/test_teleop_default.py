@@ -531,3 +531,124 @@ def test_cmd_vel_mux_mode_switch_zeros_output_without_ros():
         assert node._active_mode == "teleop"
         """
     )
+
+
+def test_teleop_joint_source_forwards_only_in_teleop_and_estop_blocks_it():
+    arm = ArmStreamGate.from_default_mode("policy")
+    assert arm.allows("teleop") is True
+    assert arm.allows("policy") is False
+    assert arm.allows("rl_arm") is False
+    assert arm.set_control_mode("vla") is True
+    assert arm.allows("teleop") is False
+    assert arm.allows("policy") is True
+    assert arm.set_control_mode("nav2") is True
+    assert arm.allows("teleop") is False
+    assert arm.set_control_mode("rl_nav") is True
+    assert arm.allows("teleop") is False
+    assert arm.allows("rl_arm") is True
+    arm.set_emergency_stop(True)
+    assert arm.allows("teleop") is False
+    assert arm.allows("rl_arm") is False
+    arm.set_emergency_stop(False)
+    assert arm.set_control_mode("teleop") is True
+    assert arm.allows("teleop") is True
+    assert arm.allows("policy") is False
+
+
+def test_arm_cmd_mux_forwards_teleop_topic_without_ros():
+    _run_stubbed(
+        """
+        import sys
+        from types import ModuleType, SimpleNamespace
+
+        def _pkg(name):
+            module = ModuleType(name)
+            sys.modules[name] = module
+            return module
+
+        rclpy = _pkg("rclpy")
+        rclpy.init = lambda *a, **k: None
+        rclpy.shutdown = lambda *a, **k: None
+        rclpy.spin = lambda *a, **k: None
+        node_mod = _pkg("rclpy.node")
+
+        class Pub:
+            def __init__(self):
+                self.msgs = []
+            def publish(self, msg):
+                self.msgs.append(msg)
+
+        class Node:
+            def __init__(self, name):
+                self._params = {}
+            def declare_parameter(self, name, default):
+                self._params[name] = default
+            def get_parameter(self, name):
+                return SimpleNamespace(value=self._params[name])
+            def create_subscription(self, *a, **k):
+                return None
+            def create_publisher(self, *a, **k):
+                return Pub()
+            def create_timer(self, *a, **k):
+                return None
+            def get_logger(self):
+                return SimpleNamespace(
+                    info=lambda *a, **k: None,
+                    warn=lambda *a, **k: None,
+                )
+            def destroy_node(self):
+                return None
+
+        node_mod.Node = Node
+        sensor = _pkg("sensor_msgs")
+        sensor_msg = _pkg("sensor_msgs.msg")
+        sensor.msg = sensor_msg
+
+        class JointState:
+            def __init__(self):
+                self.position = []
+
+        sensor_msg.JointState = JointState
+        std = _pkg("std_msgs")
+        std_msg = _pkg("std_msgs.msg")
+        std.msg = std_msg
+
+        class StringMsg:
+            def __init__(self):
+                self.data = ""
+
+        class BoolMsg:
+            def __init__(self):
+                self.data = False
+
+        std_msg.String = StringMsg
+        std_msg.Bool = BoolMsg
+
+        from omnibot_rl.arm_cmd_mux import ArmCmdMux
+
+        node = ArmCmdMux()
+        cmd = JointState()
+        cmd.position = [0.2, 0.1]
+        node._teleop_cb(cmd)
+        assert len(node._out_pub.msgs) == 1
+        node._policy_cb(cmd)
+        assert len(node._out_pub.msgs) == 1
+
+        mode = StringMsg()
+        mode.data = "vla"
+        node._control_mode_cb(mode)
+        node._out_pub.msgs.clear()
+        node._teleop_cb(cmd)
+        assert node._out_pub.msgs == []
+        node._policy_cb(cmd)
+        assert len(node._out_pub.msgs) == 1
+
+        stop = BoolMsg()
+        stop.data = True
+        node._estop_cb(stop)
+        node._out_pub.msgs.clear()
+        node._teleop_cb(cmd)
+        node._policy_cb(cmd)
+        assert node._out_pub.msgs == []
+        """
+    )

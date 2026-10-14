@@ -22,7 +22,7 @@ Detailed notes moved from the top-level README. Back to [README](../README.md).
 
 ## Gazebo Harmonic simulation
 
-One command starts Gazebo Harmonic, spawns `omnibot_description`, and bridges the base. The default is headless (`gui:=false`), which is what the `sim-smoke` job runs. The launch does not exit, so docs-test skips it.
+One command starts Gazebo Harmonic, spawns `omnibot_description`, and bridges the base and the SO-101 arm. The default is headless (`gui:=false`), which is what the `sim-smoke` job runs. The launch does not exit, so docs-test skips it.
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -30,7 +30,18 @@ source install/setup.bash
 ros2 launch omnibot_bringup sim.launch.py world:=flat
 ```
 
-`world:=apartment` loads a single room with a kitchen (counter, stove, fridge), a desk, and a door. Launch file: [`omnibot-ros2/omnibot_bringup/launch/sim.launch.py`](../omnibot-ros2/omnibot_bringup/launch/sim.launch.py). The mecanum chassis is driven in the plane (`drive:=planar` by default; `drive:=mecanum` selects the MecanumDrive plugin). Sensors in this launch are a 2D lidar, the front RGB camera, and the IMU.
+`world:=apartment` loads a single room with a kitchen (counter, stove, fridge), a desk, and a door. A dynamic `grasp_cube` sits on the desk for dataset tasks. Launch file: [`omnibot-ros2/omnibot_bringup/launch/sim.launch.py`](../omnibot-ros2/omnibot_bringup/launch/sim.launch.py). The mecanum chassis is driven in the plane (`drive:=planar` by default; `drive:=mecanum` selects the MecanumDrive plugin). Sensors in this launch are a 2D lidar, the front RGB camera, and the IMU.
+
+`arm:=true` (the default) starts [`arm_sim_driver_node`](../omnibot-ros2/omnibot_arm/scripts/arm_sim_driver_node.py). It reads [`arm_params.yaml`](../omnibot-ros2/omnibot_arm/config/arm_params.yaml) and applies `arm_safety.py` — the same joint limits, 0.15 rad per-command cap, 0.2 s command-timeout hold, and e-stop latch as the Feetech driver. Each arm joint, including `arm_gripper`, has a gz-sim `JointPositionController`. Measured joints are republished on `/arm/joint_states` with those URDF names. This launch does not start `arm_cmd_mux` or `arm_driver_node`, so command the arm on `/arm/joint_commands/out`. `/emergency_stop` true freezes the sim joints at the measured pose and rejects later commands until `/arm/enable` true while the stop is clear.
+
+`gz_ros2_control` is not used. The sim image already runs the gz-sim systems that ship with `ros_gz_sim`, including `JointPositionController` and `JointStatePublisher`. The URDF revolute stops stay the SO-101 calibration values and are not widened to the software limits.
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch omnibot_bringup sim.launch.py world:=flat
+ros2 run omnibot_arm arm_sim_scripted_move.py
+```
 
 `ros_gz_bridge` topics. `rosbridge:=true` (the default) also starts `rosbridge_websocket` on port 9090. The sim-smoke test passes `rosbridge:=false` and does not start rosbridge:
 
@@ -43,10 +54,14 @@ ros2 launch omnibot_bringup sim.launch.py world:=flat
 | `/camera/front/image_raw` | `sensor_msgs/msg/Image` |
 | `/camera/front/camera_info` | `sensor_msgs/msg/CameraInfo` |
 | `/tf` (`odom` -> `base_footprint`, added for Nav2 and `slam_toolbox`) | `tf2_msgs/msg/TFMessage` |
+| `/arm/sim/joint_states` | `sensor_msgs/msg/JointState` (Gazebo arm joints) |
+| `/arm/sim/<joint>/cmd_pos` | `std_msgs/msg/Float64` (one topic per arm joint, ROS to Gazebo) |
+
+ROS topics that are not bridged: `/arm/joint_commands/out` and `/arm/enable` and `/emergency_stop` go to `arm_sim_driver`, which publishes `/arm/joint_states`.
 
 Bridge config: [`omnibot-ros2/omnibot_bringup/config/sim_bridge.yaml`](../omnibot-ros2/omnibot_bringup/config/sim_bridge.yaml).
 
-The headless launch test [`omnibot-ros2/omnibot_bringup/test/test_sim_launch.py`](../omnibot-ros2/omnibot_bringup/test/test_sim_launch.py) checks that `/odom`, `/scan`, `/imu`, and `/camera/front/image_raw` publish within 30 s and that `/cmd_vel` moves the robot at least 0.2 m. The `sim-smoke` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs it on `ros:jazzy`.
+The headless launch test [`omnibot-ros2/omnibot_bringup/test/test_sim_launch.py`](../omnibot-ros2/omnibot_bringup/test/test_sim_launch.py) checks that `/odom`, `/scan`, `/imu`, and `/camera/front/image_raw` publish within 30 s and that `/cmd_vel` moves the robot at least 0.2 m. The same launch runs [`arm_sim_scripted_move.py`](../omnibot-ros2/omnibot_arm/scripts/arm_sim_scripted_move.py), which moves each arm joint to a target within 0.08 rad and checks that `/emergency_stop` holds that pose. The `sim-smoke` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs it on `ros:jazzy`.
 
 Eight frames from `/camera/front/image_raw` saved by that test (`OMNIBOT_SIM_FRAME_DIR`) while it published `/cmd_vel` in `world:=flat`. The red box is the `marker` model in [`flat.sdf`](../omnibot-ros2/omnibot_bringup/worlds/flat.sdf):
 

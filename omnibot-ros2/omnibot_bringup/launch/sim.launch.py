@@ -11,18 +11,29 @@ lidar, the front RGB camera, and the IMU. ros_gz_bridge bridges:
 
     /cmd_vel  /odom  /scan  /imu  /camera/front/image_raw
     /camera/front/camera_info  /clock
+    /arm/sim/joint_states  /arm/sim/<joint>/cmd_pos
 
 `rosbridge:=true` (the default) also starts rosbridge_websocket on port 9090
 bound to 127.0.0.1 so a browser on this machine can drive this stack.
 `rosbridge_address:=0.0.0.0` exposes it on the network without authentication.
 The sim-smoke test passes `rosbridge:=false` and does not start rosbridge.
-This launch does not start foxglove or the arm driver.
+`arm:=true` (the default) starts arm_sim_driver, which consumes
+/arm/joint_commands/out, applies arm_safety, and publishes /arm/joint_states.
+This launch does not start foxglove, arm_cmd_mux, or the Feetech arm driver.
 
 `drive:=mecanum` selects the gz-sim MecanumDrive plugin instead of planar move.
 `gui:=true` opens the Gazebo client; the default is server-only so CI has no display.
+
+`pick_place:=false` (the default) does not add a table, cube, or bin. The
+apartment SDF is unchanged. `pick_place:=true` spawns those three models
+after Gazebo is up. Cube and bin poses come from `pick_place_seed`.
+`cmd_vel_from_mux:=false` (the default) still bridges ROS `/cmd_vel` into
+Gazebo. `cmd_vel_from_mux:=true` bridges `/cmd_vel/out` instead, so the
+base moves only through cmd_vel_mux.
 """
 
 import os
+import sys
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, TimerAction
@@ -31,6 +42,19 @@ from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+
+
+def _enabled(value):
+    return str(value).strip().lower() in ("1", "true", "yes")
+
+
+def _spawn_module():
+    scripts = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import pick_place_spawn
+
+    return pick_place_spawn
 
 
 def _world_path(bringup_share, world):
@@ -66,7 +90,9 @@ def _launch_sim(context, *args, **kwargs):
 
     world_path = _world_path(bringup, world_key)
     xacro_file = os.path.join(description, "urdf", "omnibot.urdf.xacro")
-    bridge_config = os.path.join(bringup, "config", "sim_bridge.yaml")
+    from_mux = _enabled(LaunchConfiguration("cmd_vel_from_mux").perform(context))
+    bridge_name = "sim_bridge_mux.yaml" if from_mux else "sim_bridge.yaml"
+    bridge_config = os.path.join(bringup, "config", bridge_name)
 
     robot_desc = ParameterValue(
         Command(
@@ -134,6 +160,28 @@ def _launch_sim(context, *args, **kwargs):
     )
 
     actions = [gazebo, robot_state_publisher, spawn, bridge]
+    arm_on = LaunchConfiguration("arm").perform(context).lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if arm_on:
+        arm_share = FindPackageShare("omnibot_arm").perform(context)
+        arm_params = os.path.join(arm_share, "config", "arm_params.yaml")
+        actions.append(
+            Node(
+                package="omnibot_arm",
+                executable="arm_sim_driver_node.py",
+                name="arm_sim_driver_node",
+                output="screen",
+                parameters=[
+                    {
+                        "arm_params_file": arm_params,
+                        "use_sim_time": False,
+                    }
+                ],
+            )
+        )
     rosbridge_on = LaunchConfiguration("rosbridge").perform(context).lower() in (
         "1",
         "true",
@@ -148,6 +196,28 @@ def _launch_sim(context, *args, **kwargs):
                 name="rosbridge_websocket",
                 output="screen",
                 parameters=[{"port": 9090, "address": address}],
+            )
+        )
+    # Default off. The apartment SDF is not modified.
+    if _enabled(LaunchConfiguration("pick_place").perform(context)):
+        spawn_api = _spawn_module()
+        seed = spawn_api.parse_seed(LaunchConfiguration("pick_place_seed").perform(context))
+        world_name = spawn_api.world_name_for(world_key, world_path)
+        models_dir = os.path.join(bringup, "models")
+        plan = spawn_api.spawn_plan(True, seed, models_dir, world_name)
+        actions.append(
+            TimerAction(
+                period=6.0,
+                actions=[
+                    Node(
+                        package="ros_gz_sim",
+                        executable="create",
+                        name=f"spawn_{item['name']}",
+                        output="screen",
+                        arguments=item["arguments"],
+                    )
+                    for item in plan
+                ],
             )
         )
     return actions
@@ -172,12 +242,42 @@ def generate_launch_description():
                 description="Open the Gazebo GUI. Default is headless.",
             ),
             DeclareLaunchArgument(
+                "arm",
+                default_value="true",
+                description=(
+                    "Start arm_sim_driver. It reads arm_params.yaml and "
+                    "commands the SO-101 joints in Gazebo. "
+                    "Set false for a base-only launch."
+                ),
+            ),
+            DeclareLaunchArgument(
                 "rosbridge",
                 default_value="true",
                 description=(
                     "Start rosbridge_websocket on port 9090, bound to "
                     "rosbridge_address (127.0.0.1 by default). "
                     "The sim-smoke test sets this false."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "pick_place",
+                default_value="false",
+                description=(
+                    "Spawn a table, rigid cube, and bin. Default false leaves "
+                    "the world SDF unchanged. Cube and bin poses use pick_place_seed."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "pick_place_seed",
+                default_value="0",
+                description="Integer seed for the cube and bin poses. Ignored unless pick_place is true.",
+            ),
+            DeclareLaunchArgument(
+                "cmd_vel_from_mux",
+                default_value="false",
+                description=(
+                    "Bridge Gazebo /cmd_vel from ROS /cmd_vel/out. "
+                    "Default false keeps the direct /cmd_vel bridge."
                 ),
             ),
             DeclareLaunchArgument(

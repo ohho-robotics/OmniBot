@@ -8,6 +8,8 @@ arm_driver_node subscribes to /arm/joint_commands/out.
 Topic routing
 ─────────────
   Inputs (one active at a time):
+    /arm/joint_commands/teleop ← VR client, after teleop_safety. Forwarded
+                                 only while /control_mode is teleop.
     /arm/joint_commands        ← policy_node / Android / teleop_recorder
     /arm/joint_commands/rl     ← RL arm policy (rl_arm_node)
 
@@ -37,8 +39,10 @@ Usage
 Startup control mode is teleop, so policy and RL arm commands are not
 forwarded until /control_mode is vla, nav2, or rl_nav. /arm/joint_commands
 is shared by the visuomotor policy and Android joint teleop, so Android
-arm commands are held in teleop as well. Base teleop uses /cmd_vel/teleop
-and is not gated here. Not run on hardware in this change.
+arm commands are held in teleop as well. /arm/joint_commands/teleop is
+forwarded while control mode is teleop and the e-stop is clear. Base
+teleop uses /cmd_vel/teleop and is not gated here. Not run on hardware
+in this change.
 
 This mux does not clamp, hold, or drop torque. arm_driver_node applies
 those checks on /arm/joint_commands/out (emergency stop, 200 ms silence
@@ -76,6 +80,9 @@ class ArmCmdMux(Node):
         self._active_mode: str = self._gate.arm_mode
 
         # ── Inputs ────────────────────────────────────────────────────────────
+        self.create_subscription(
+            JointState, "/arm/joint_commands/teleop", self._teleop_cb, 10
+        )
         self.create_subscription(JointState, "/arm/joint_commands", self._policy_cb, 10)
         self.create_subscription(
             JointState, "/arm/joint_commands/rl", self._rl_arm_cb, 10
@@ -94,7 +101,8 @@ class ArmCmdMux(Node):
 
         self.get_logger().info(
             f'ArmCmdMux ready. Control mode: "{self._gate.control_mode}" '
-            f'(arm outputs held). Arm source preference: "{self._active_mode}". '
+            f"(teleop joints forwarded; policy and RL held). "
+            f'Arm source preference: "{self._active_mode}". '
             f"Valid arm sources: {self.VALID_MODES}"
         )
 
@@ -140,6 +148,10 @@ class ArmCmdMux(Node):
             self.get_logger().info("Emergency stop cleared.")
 
     # ── Source callbacks ──────────────────────────────────────────────────────
+
+    def _teleop_cb(self, msg: JointState) -> None:
+        if self._gate.allows("teleop"):
+            self._out_pub.publish(msg)
 
     def _policy_cb(self, msg: JointState) -> None:
         if self._gate.allows("policy"):
