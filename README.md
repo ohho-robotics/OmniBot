@@ -200,7 +200,7 @@ flowchart LR
   AD --> LR
 ```
 
-Details: control-mode gating in [docs/reference.md](docs/reference.md#bring-up-control-mode), arm and policy safety in [docs/safety.md](docs/safety.md).
+Details: control-mode gating in [docs/reference.md](docs/reference.md#bring-up-control-mode), arm and policy safety in [docs/safety.md](docs/safety.md). October pick-and-place fill-in: [docs/october-task.md](docs/october-task.md).
 
 ## Roadmap
 
