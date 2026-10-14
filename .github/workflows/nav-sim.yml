@@ -60,8 +60,9 @@ jobs:
           # The 3-D mapping stack (RTAB-Map, OctoMap) is not used in this sim.
           # omnibot_hybrid and omnibot_rl are workspace packages declared as
           # exec_depend by omnibot_bringup. They are not rosdep keys; listing
-          # them here lets --ignore-src skip them. Nav scenarios leave vr off,
-          # so they are not built or launched.
+          # them here lets --ignore-src skip them. The build step still
+          # selects them: colcon requires their package.sh before bringup.
+          # Nav scenarios leave vr off, so those nodes are not launched.
           rosdep install \
             --from-paths \
               src/omnibot_description \
@@ -78,7 +79,13 @@ jobs:
           set -eo pipefail
           source /opt/ros/jazzy/setup.bash
           colcon build --symlink-install --base-paths src \
-            --packages-select omnibot_description omnibot_arm omnibot_bringup omnibot_navigation
+            --packages-select \
+              omnibot_description \
+              omnibot_arm \
+              omnibot_hybrid \
+              omnibot_rl \
+              omnibot_bringup \
+              omnibot_navigation
       - name: ROS-free checks (waypoints, Nav2 params, saved map)
         shell: bash
         run: |

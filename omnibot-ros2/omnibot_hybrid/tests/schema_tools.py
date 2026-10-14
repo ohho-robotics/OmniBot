@@ -1,13 +1,18 @@
-"""jsonschema helpers for the copied ohho.telemetry.v1 fixtures."""
+"""jsonschema helpers for the copied ohho.telemetry.v1 fixtures.
+
+Ubuntu 24.04's ``python3-jsonschema`` is 4.10.3. That Debian package has
+``RefResolver`` and no ``referencing`` library, and pip cannot replace it.
+jsonschema >= 4.18 resolves the same sibling ``$ref``s through a registry.
+"""
 
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
-from referencing import Registry, Resource
 
 from omnibot_hybrid.telemetry_snapshot import schema_body
 
@@ -23,16 +28,46 @@ SCHEMA_FILES = (
 )
 
 
+def _registry_for(store: dict[str, dict]):
+    """A referencing registry on jsonschema >= 4.18, else None (Debian 4.10)."""
+    try:
+        parameters = inspect.signature(Draft202012Validator).parameters
+    except (TypeError, ValueError):
+        return None
+    if "registry" not in parameters:
+        return None
+    try:
+        from referencing import Registry, Resource
+    except ImportError:
+        return None
+    resources = [
+        (uri, Resource.from_contents(document)) for uri, document in store.items()
+    ]
+    return Registry().with_resources(resources)
+
+
+def _draft202012(schema: dict, store: dict[str, dict]) -> Draft202012Validator:
+    registry = _registry_for(store)
+    if registry is not None:
+        return Draft202012Validator(schema, registry=registry)
+    from jsonschema import RefResolver
+
+    resolver = RefResolver(
+        base_uri=schema.get("$id", ""),
+        referrer=schema,
+        store=store,
+    )
+    return Draft202012Validator(schema, resolver=resolver)
+
+
 def load_validators() -> dict[str, Draft202012Validator]:
     schemas: dict[str, dict] = {}
-    resources = []
     for name in SCHEMA_FILES:
         document = json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
         schemas[name] = document
-        resources.append((document["$id"], Resource.from_contents(document)))
-    registry = Registry().with_resources(resources)
+    store = {document["$id"]: document for document in schemas.values()}
     return {
-        name: Draft202012Validator(schemas[name], registry=registry)
+        name: _draft202012(schemas[name], store)
         for name in SCHEMA_FILES
         if name != "defs.json"
     }

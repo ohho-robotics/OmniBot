@@ -16,7 +16,6 @@ import json
 import os
 import threading
 import time
-from pathlib import Path
 
 import pytest
 
@@ -106,23 +105,6 @@ def test_telemetry_publishes_about_20hz():
     assert document["v"] == "1.0.0"
     assert document["kind"] == "real"
     assert "age_ms" in document
-    body = schema_body(document)
-    try:
-        import jsonschema
-        from referencing import Registry, Resource
-    except ImportError:
-        return
-    fixture = (
-        Path(__file__).resolve().parents[1] / "test" / "fixtures" / "ohho.telemetry.v1"
-    )
-    schemas = {}
-    resources = []
-    for name in ("defs.json", "telemetry.json"):
-        doc = json.loads((fixture / name).read_text(encoding="utf-8"))
-        schemas[name] = doc
-        resources.append((doc["$id"], Resource.from_contents(doc)))
-    validator = jsonschema.Draft202012Validator(
-        schemas["telemetry.json"],
-        registry=Registry().with_resources(resources),
-    )
-    validator.validate(body)
+    from schema_tools import load_validators
+
+    load_validators()["telemetry.json"].validate(schema_body(document))
