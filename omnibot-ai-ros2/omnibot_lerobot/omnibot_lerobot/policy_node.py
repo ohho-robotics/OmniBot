@@ -11,8 +11,11 @@ Unified 9-DOF action space: [arm(6), base_vx, base_vy, base_vz]
 
 Parameters
 ----------
-model_type           : str   — registry name: "smolvla" | "act" | "diffusion" | "openvla"
-checkpoint_path      : str   — HuggingFace hub ID or local path
+model_type           : str   — registry name: "smolvla" | "act" | "diffusion" | "openvla" | "serve"
+checkpoint_path      : str   — HuggingFace hub ID or local path (``hf://…`` for Serve)
+serve_url            : str   — OhhO Serve base URL when model_type is "serve"
+serve_timeout_sec    : float — HTTP timeout for Serve /predict (default 0.5)
+serve_api_key        : str   — optional X-API-Key for Serve
 device               : str   — "cuda" | "cpu"
 policy_hz            : float — inference rate (Hz)
 state_dim            : int   — proprioceptive state dimension (default 9)
@@ -164,6 +167,9 @@ class PolicyNode(Node):
         self.declare_parameter(
             "joint_max", [3.14, 1.57, 1.57, 1.57, 3.14, 0.8]
         )
+        self.declare_parameter("serve_url", "http://127.0.0.1:8000")
+        self.declare_parameter("serve_timeout_sec", 0.5)
+        self.declare_parameter("serve_api_key", "")
 
         model_type = self.get_parameter("model_type").value
         checkpoint = self.get_parameter("checkpoint_path").value
@@ -224,7 +230,17 @@ class PolicyNode(Node):
             self.device = None
 
         # Load policy
-        self.adapter = self._load_adapter(model_type, checkpoint, device_str)
+        serve_url = self.get_parameter("serve_url").value
+        serve_timeout = float(self.get_parameter("serve_timeout_sec").value)
+        serve_api_key = self.get_parameter("serve_api_key").value
+        self.adapter = self._load_adapter(
+            model_type,
+            checkpoint,
+            device_str,
+            serve_url=serve_url,
+            serve_timeout_sec=serve_timeout,
+            serve_api_key=serve_api_key,
+        )
 
         # Safety guard for camera frame validation, inference latency, and arm clamping
         self.guard = PolicyGuard(
@@ -287,7 +303,16 @@ class PolicyNode(Node):
     # Policy loading
     # ------------------------------------------------------------------
 
-    def _load_adapter(self, model_type: str, checkpoint: str, device_str: str):
+    def _load_adapter(
+        self,
+        model_type: str,
+        checkpoint: str,
+        device_str: str,
+        *,
+        serve_url: str = "http://127.0.0.1:8000",
+        serve_timeout_sec: float = 0.5,
+        serve_api_key: str = "",
+    ):
         if not REGISTRY_AVAILABLE:
             self.get_logger().warn(
                 "lerobot_engine not on PYTHONPATH — using zero-action DummyAdapter. "
@@ -297,7 +322,19 @@ class PolicyNode(Node):
 
         try:
             self.get_logger().info(f'Loading "{model_type}" from "{checkpoint}"...')
-            adapter = make_policy(model_type, checkpoint=checkpoint, device=device_str)
+            extra = {}
+            if model_type == "serve":
+                extra = {
+                    "serve_url": serve_url,
+                    "timeout_sec": serve_timeout_sec,
+                    "api_key": serve_api_key,
+                }
+            adapter = make_policy(
+                model_type,
+                checkpoint=checkpoint,
+                device=device_str,
+                **extra,
+            )
             self.get_logger().info(f"Policy loaded. image_keys={adapter.image_keys}")
 
             if self.use_trt and self.trt_engine_path:
@@ -489,6 +526,7 @@ class PolicyNode(Node):
             self.get_logger().error(
                 f"Inference error: {exc}", throttle_duration_sec=5.0
             )
+            self._publish_zero_base()
 
     def _publish_zero_base(self) -> None:
         """Publish zero base velocity when policy tick is skipped."""
