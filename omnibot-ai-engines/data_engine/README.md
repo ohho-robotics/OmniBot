@@ -60,7 +60,15 @@ python -m data_engine.scripts.ingest_dataset \
 ### Validate
 ```bash
 python -m data_engine.scripts.validate_dataset --dataset /data/lerobot/pick_place
+python -m data_engine.scripts.validate_lerobot_load --dataset /data/lerobot/pick_place
 ```
+
+### Sync jitter (dataset card)
+```bash
+python -m data_engine.scripts.measure_sync_jitter --dataset /data/lerobot/pick_place
+```
+
+See `dataset_card_template.md` for fields to publish after a real robot capture.
 
 ### Quality filter (OHH-99)
 

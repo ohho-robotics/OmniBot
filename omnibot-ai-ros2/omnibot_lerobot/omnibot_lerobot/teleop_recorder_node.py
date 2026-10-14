@@ -16,8 +16,8 @@ Topics subscribed:
   /arm/leader_states           (sensor_msgs/JointState) - leader arm (arm actions)
   /arm/joint_states            (sensor_msgs/JointState) - follower arm (arm observations)
   /joy                         (sensor_msgs/Joy)         - Xbox controller
-  /camera/wrist/image_raw      (sensor_msgs/Image)
-  /camera/base/bev/image_raw   (sensor_msgs/Image)       - BEV mosaic from 4 base cameras
+  /camera/wrist/image_raw      (sensor_msgs/Image)  → observation.images.wrist
+  /camera/base/bev/image_raw   (sensor_msgs/Image)  → observation.images.bev
   /odom                        (nav_msgs/Odometry)       - base velocity
 
 Unified 9D action:  [arm(6), base_vx, base_vy, base_vz]
@@ -51,11 +51,17 @@ except ImportError:
 # Optional LeRobot import
 # ---------------------------------------------------------------------------
 try:
-    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
-
-    LEROBOT_AVAILABLE = True
+    from omnibot_lerobot.ohho_teleop_recorder import (
+        OHHO_AVAILABLE,
+        WRITER_AVAILABLE,
+        OhhoTeleopRecorder,
+    )
 except ImportError:
-    LEROBOT_AVAILABLE = False
+    OHHO_AVAILABLE = False
+    WRITER_AVAILABLE = False
+    OhhoTeleopRecorder = None  # type: ignore[misc, assignment]
+
+OHHO_RECORDING = OHHO_AVAILABLE and WRITER_AVAILABLE
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -125,6 +131,14 @@ class TeleopRecorderNode(Node):
         self.prev_joy_buttons = [0] * 16
         self.wrist_image = None  # numpy HxWx3 uint8 RGB
         self.bev_image = None  # numpy HxWx3 uint8 RGB — BEV mosaic from 4 base cameras
+        self.wrist_msg_time = None
+        self.bev_msg_time = None
+
+        self._ohho_rec = (
+            OhhoTeleopRecorder(self.repo_id, self.record_hz)
+            if OHHO_RECORDING and OhhoTeleopRecorder is not None
+            else None
+        )
 
         # ------------------------------------------------------------------
         # cv_bridge
@@ -161,7 +175,7 @@ class TeleopRecorderNode(Node):
 
         self.get_logger().info(
             f"TeleopRecorderNode started | hz={self.record_hz} | "
-            f"output={self.output_dir} | lerobot={'yes' if LEROBOT_AVAILABLE else 'no (numpy fallback)'}"
+            f"output={self.output_dir} | writer={'ohho-os+data_engine' if self._ohho_rec else 'numpy fallback'}"
         )
         self.get_logger().info(
             f"Press button {self.joy_record_button} (RB) to start/stop recording. "
@@ -218,11 +232,18 @@ class TeleopRecorderNode(Node):
         self.joy_buttons = list(msg.buttons)
         self._handle_button_events()
 
+    def _image_stamp_s(self, msg: Image) -> float:
+        if msg.header.stamp.sec or msg.header.stamp.nanosec:
+            return msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        return time.time()
+
     def wrist_image_cb(self, msg: Image):
         self.wrist_image = self._ros_image_to_numpy_rgb(msg)
+        self.wrist_msg_time = self._image_stamp_s(msg)
 
     def bev_image_cb(self, msg: Image):
         self.bev_image = self._ros_image_to_numpy_rgb(msg)
+        self.bev_msg_time = self._image_stamp_s(msg)
 
     # ------------------------------------------------------------------
     # Button handling
@@ -246,6 +267,8 @@ class TeleopRecorderNode(Node):
             self.episode_buffer = []
             self.frame_count = 0
             self.recording_start_time = time.time()
+            if self._ohho_rec is not None:
+                self._ohho_rec.start_episode(self.task_description)
             self.record_state = RecordState.RECORDING
             self.get_logger().info(
                 f"Recording episode {self.episode_index} ... "
@@ -266,6 +289,8 @@ class TeleopRecorderNode(Node):
             )
             self.episode_buffer = []
             self.frame_count = 0
+            if self._ohho_rec is not None:
+                self._ohho_rec.discard_episode()
             self.record_state = RecordState.IDLE
 
     # ------------------------------------------------------------------
@@ -321,15 +346,28 @@ class TeleopRecorderNode(Node):
             else np.zeros((240, 320, 3), dtype=np.uint8)
         )
 
-        frame = {
-            "state": full_state.astype(np.float32),
-            "action": full_action.astype(np.float32),
-            "wrist_image": wrist_img,
-            "bev_image": bev_img,  # BEV mosaic from 4 base cameras
-            "timestamp": time.time(),
-        }
-        self.episode_buffer.append(frame)
-        self.frame_count += 1
+        wall_t = time.time()
+        if self._ohho_rec is not None:
+            self._ohho_rec.capture_frame(
+                full_state,
+                full_action,
+                wrist_img,
+                bev_img,
+                wall_timestamp=wall_t,
+                wrist_timestamp=self.wrist_msg_time,
+                bev_timestamp=self.bev_msg_time,
+            )
+            self.frame_count = self._ohho_rec.frame_count
+        else:
+            frame = {
+                "state": full_state.astype(np.float32),
+                "action": full_action.astype(np.float32),
+                "wrist_image": wrist_img,
+                "bev_image": bev_img,
+                "timestamp": wall_t,
+            }
+            self.episode_buffer.append(frame)
+            self.frame_count += 1
 
     # ------------------------------------------------------------------
     # Episode saving
@@ -337,14 +375,19 @@ class TeleopRecorderNode(Node):
 
     def _save_episode(self):
         """Save the current episode buffer to disk."""
-        if not self.episode_buffer:
+        if self.frame_count == 0 and not self.episode_buffer:
             self.get_logger().warn("No frames to save.")
             self.record_state = RecordState.IDLE
             return
 
         try:
-            if LEROBOT_AVAILABLE:
-                self._save_lerobot_format()
+            if self._ohho_rec is not None:
+                self._ohho_rec.save_episode(
+                    self.output_dir,
+                    self.task_description,
+                    self.record_hz,
+                    self.repo_id,
+                )
             else:
                 self._save_numpy_format()
 
@@ -360,51 +403,6 @@ class TeleopRecorderNode(Node):
             self.episode_buffer = []
             self.frame_count = 0
             self.record_state = RecordState.IDLE
-
-    def _save_lerobot_format(self):
-        """Save episode using LeRobot HuggingFace dataset format."""
-        features = {
-            "observation.state": {
-                "dtype": "float32",
-                "shape": (9,),
-                "names": {"joints": JOINT_NAMES + ["base_vx", "base_vy", "base_vz"]},
-            },
-            "action": {
-                "dtype": "float32",
-                "shape": (9,),
-                "names": {"joints": JOINT_NAMES + ["base_vx", "base_vy", "base_vz"]},
-            },
-            "observation.images.wrist": {
-                "dtype": "video",
-                "shape": (3, 240, 320),
-                "names": ["channels", "height", "width"],
-            },
-            "observation.images.bev": {
-                "dtype": "video",
-                "shape": (3, 240, 320),
-                "names": ["channels", "height", "width"],
-            },
-        }
-
-        dataset = LeRobotDataset.create(
-            repo_id=self.repo_id,
-            fps=int(self.record_hz),
-            root=self.output_dir,
-            features=features,
-            image_writer_threads=4,
-        )
-
-        for frame in self.episode_buffer:
-            dataset.add_frame(
-                {
-                    "observation.state": frame["state"],
-                    "action": frame["action"],
-                    "observation.images.wrist": frame["wrist_image"],
-                    "observation.images.bev": frame["bev_image"],
-                }
-            )
-
-        dataset.save_episode(task=self.task_description)
 
     def _save_numpy_format(self):
         """Fallback: save episode as .npz file."""
@@ -429,7 +427,8 @@ class TeleopRecorderNode(Node):
             fps=np.array([self.record_hz]),
         )
         self.get_logger().info(
-            f"Saved numpy episode to {ep_dir}/data.npz (install lerobot for HF format)"
+            f"Saved numpy episode to {ep_dir}/data.npz "
+            f"(pip install ohho-os and set PYTHONPATH to omnibot-ai-engines for LeRobot v2)"
         )
 
 
