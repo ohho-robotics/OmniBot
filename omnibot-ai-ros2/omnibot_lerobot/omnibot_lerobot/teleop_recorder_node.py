@@ -20,6 +20,11 @@ Topics subscribed:
   /camera/base/bev/image_raw   (sensor_msgs/Image)       - BEV mosaic from 4 base cameras
   /odom                        (nav_msgs/Odometry)       - base velocity
 
+This node does not publish arm joint commands. Headset and Android teleop
+publish /arm/joint_commands/teleop, which arm_cmd_mux forwards only in
+teleop when /emergency_stop is clear. Leader positions stay on
+/arm/leader_states and are not mirrored onto a command topic.
+
 Unified 9D action:  [arm(6), base_vx, base_vy, base_vz]
 Unified 9D state:   [arm(6), base_vx, base_vy, base_vz]
 """
