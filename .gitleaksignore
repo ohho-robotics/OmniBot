@@ -1,0 +1,6 @@
+# Historical findings from the initial split commit
+# 187dec2cf0daa2145ef771bf696a0e5bed6dd865 (2026-09-25).
+# These credentials are still in git history and MUST BE ROTATED by Varun.
+# Narrow allowlist: these two fingerprints only. Do not allowlist the rule or path.
+187dec2cf0daa2145ef771bf696a0e5bed6dd865:omnibot-vr/Assets/Resources/DevAgentSettings.asset:generic-api-key:24
+187dec2cf0daa2145ef771bf696a0e5bed6dd865:omnibot-vr/Assets/Resources/vr_manifest.json:jwt:21
