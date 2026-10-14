@@ -19,10 +19,11 @@ the snippet is the only process on port 9090. The snippet keeps the
 upstreams on 127.0.0.1. A missing snippet does not bind 0.0.0.0.
 
 nav:=true starts the apartment Nav2 stack from omnibot_navigation without
-a second Gazebo. arm:=true, cameras:=extra, and telemetry:=true are include
-points for OHH-199 (sim_arm.launch.py / arm_sim_driver), OHH-200
-(sim_cameras.launch.py), and telemetry_aggregator.launch.py. Those files
-are not in this tree; asking for them logs that and the profile still starts.
+a second Gazebo. arm:=true includes omnibot_arm/launch/sim_arm.launch.py,
+which mirrors /arm/joint_commands/out onto /arm/joint_states. This profile
+does not start OHH-199's arm_sim_driver. cameras:=extra and telemetry:=true
+include sim_cameras.launch.py and telemetry_aggregator.launch.py when those
+files are installed; a missing include is logged and the profile still starts.
 """
 
 import os
@@ -333,9 +334,10 @@ def generate_launch_description():
                 "arm",
                 default_value=_support.DEFAULT_ARM,
                 description=(
-                    "OHH-199 include point. When true, include "
-                    "omnibot_arm/launch/sim_arm.launch.py if it is installed. "
-                    "This profile does not start arm_sim_driver itself."
+                    "Include omnibot_arm/launch/sim_arm.launch.py when it is "
+                    "installed. That file mirrors /arm/joint_commands/out onto "
+                    "/arm/joint_states. This profile does not start "
+                    "arm_sim_driver itself."
                 ),
             ),
             DeclareLaunchArgument(
