@@ -36,7 +36,7 @@
 ## Why OmniBot
 
 - **Full mobile-manipulation stack in one repo**: mecanum base driver and kinematics, SO-101 arm with e-stop and joint-limit safety, Nav2/SLAM, Gazebo Harmonic sim, and LeRobot data capture feeding VLA/RL policies.
-- **Teleop from anywhere**: Xbox gamepad, Android app, Meta Quest VR, or the browser via rosbridge.
+- **Teleop from anywhere**: Xbox gamepad, Android app, Meta Quest VR ([OhhO-VR](https://github.com/ohho-robotics/OhhO-VR)), or the browser via rosbridge.
 - **Honest and tested**: README commands run in CI. Anything that needs a robot or GPU is labelled as such in [docs/reference.md](docs/reference.md).
 
 ## Quickstart (no robot, no GPU)
@@ -165,7 +165,7 @@ These are the parts referenced in this repo's code and docs. Prices are not yet 
 | Orbbec Astra Pro RGB-D camera | 1 | [sensor guide](omnibot-ros2/omnibot_navigation/docs/SENSOR_INTEGRATION.md) | TBD |
 | Wrist camera | 1 | [`perception.launch.py`](omnibot-ros2/omnibot_bringup/launch/perception.launch.py) | TBD |
 | Xbox controller (teleop) | 1 | [`robot_with_joy.launch.py`](omnibot-ros2/omnibot_bringup/launch/robot_with_joy.launch.py) | TBD |
-| Meta Quest 3 / 3S (optional VR teleop) | 0–1 | [`omnibot-vr/`](omnibot-vr/) | TBD |
+| Meta Quest 3 / 3S (optional VR teleop) | 0–1 | [OhhO-VR](https://github.com/ohho-robotics/OhhO-VR) | TBD |
 | Desktop PC with NVIDIA GPU (optional, VLA/RL) | 0–1 | [`omnibot-ai-ros2/omnibot_vla/README.md`](omnibot-ai-ros2/omnibot_vla/README.md) | TBD |
 | Battery, wiring, mounts | — | Not documented yet | TBD |
 
@@ -175,7 +175,7 @@ These are the parts referenced in this repo's code and docs. Prices are not yet 
 flowchart LR
   subgraph Inputs
     T["Xbox / keyboard teleop<br/>/cmd_vel/teleop"]
-    A[Android app & Quest VR<br/>via rosbridge]
+    A[Android app & OhhO-VR<br/>via rosbridge]
     N[Nav2 / SLAM]
     V[VLA policy_node]
     R[RL policy]
@@ -230,10 +230,10 @@ Demos and updates: [YouTube](https://www.youtube.com/@varun.vaidhiya/videos) · 
 | [`ros2-bev-stitcher/`](ros2-bev-stitcher/) | Bird's-eye homography |
 | [`omnibot-digital-twin/`](omnibot-digital-twin/) | Gazebo world and compose files |
 | [`omnibot-android/`](omnibot-android/) | Kotlin controller |
-| [`omnibot-vr/`](omnibot-vr/) | Unity Quest project |
+| [`omnibot-vr/`](omnibot-vr/) | Retired pointer to the Quest app ([OhhO-VR](https://github.com/ohho-robotics/OhhO-VR)) |
 
 ## License
 
-[Apache-2.0](LICENSE) for OhhO code in this repository. Vendored Meta XR SDK and CoplayDev unity-mcp packages keep their own licences. See [NOTICE](NOTICE).
+[Apache-2.0](LICENSE) for OhhO code in this repository. Quest-app licences live in [OhhO-VR](https://github.com/ohho-robotics/OhhO-VR). See [NOTICE](NOTICE).
 
 ⭐ **Star the repo** to follow progress.
