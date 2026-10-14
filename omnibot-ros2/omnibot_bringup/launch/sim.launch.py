@@ -18,10 +18,11 @@ bound to 127.0.0.1 so a browser on this machine can drive this stack.
 The sim-smoke test passes `rosbridge:=false` and does not start rosbridge.
 This launch does not start foxglove or the arm driver.
 
-`vr:=true` is the sim VR profile. It starts teleop_safety, cmd_vel_mux, and
-arm_cmd_mux, and bridges Gazebo's /cmd_vel from /cmd_vel/out. Clients publish
-/cmd_vel/teleop_raw and /arm/joint_commands/teleop_raw. The default `vr:=false`
-path is unchanged and still drives Gazebo on /cmd_vel.
+`vr:=true` starts teleop_safety, cmd_vel_mux, and arm_cmd_mux, and bridges
+Gazebo's /cmd_vel from /cmd_vel/out. Clients publish /cmd_vel/teleop_raw and
+/arm/joint_commands/teleop_raw. The default `vr:=false` path is unchanged and
+still drives Gazebo on /cmd_vel. The full VR profile is sim_vr.launch.py
+(apartment world, this flag, web_video_server, optional Nav2).
 
 `drive:=mecanum` selects the gz-sim MecanumDrive plugin instead of planar move.
 `gui:=true` opens the Gazebo client; the default is server-only so CI has no display.
@@ -222,10 +223,11 @@ def generate_launch_description():
                 "vr",
                 default_value="false",
                 description=(
-                    "Sim VR profile. Start teleop_safety plus the base and arm "
-                    "muxes, and drive Gazebo from /cmd_vel/out. Clients publish "
+                    "Start teleop_safety plus the base and arm muxes, and drive "
+                    "Gazebo from /cmd_vel/out. Clients publish "
                     "/cmd_vel/teleop_raw and /arm/joint_commands/teleop_raw. "
-                    "Default false keeps the /cmd_vel smoke-test path."
+                    "Default false keeps the /cmd_vel smoke-test path. "
+                    "sim_vr.launch.py is the profile that turns this on."
                 ),
             ),
             DeclareLaunchArgument(
