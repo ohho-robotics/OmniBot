@@ -64,8 +64,13 @@ def test_ceilings_match_omnibot_profile_and_stop_budget():
     assert HEARTBEAT_TIMEOUT_S == 0.3
     assert MAX_JOINT_DELTA_RAD <= 0.15
     assert CMD_TIMEOUT_S + 0.01 <= 0.350
-    assert "TICK_PERIOD_S = 0.01" in NODE_SRC.read_text(encoding="utf-8")
-    assert "declare_parameter" not in NODE_SRC.read_text(encoding="utf-8")
+    source = NODE_SRC.read_text(encoding="utf-8")
+    assert "TICK_PERIOD_S = 0.01" in source
+    assert "declare_parameter" not in source
+    # Jazzy's rclpy.parameter does not export SetParametersResult. The callback
+    # result is the rcl_interfaces message.
+    assert "from rcl_interfaces.msg import SetParametersResult" in source
+    assert "from rclpy.parameter import SetParametersResult" not in source
 
 
 def test_callers_cannot_raise_caps_or_timeouts(tmp_path):
@@ -338,14 +343,16 @@ def test_node_wiring_latch_and_service_without_ros(tmp_path):
         clock_mod = _pkg("rclpy.clock")
         clock_mod.Clock = lambda *a, **k: None
         clock_mod.ClockType = SimpleNamespace(STEADY_TIME=0)
-        param_mod = _pkg("rclpy.parameter")
+        iface = _pkg("rcl_interfaces")
+        iface_msg = _pkg("rcl_interfaces.msg")
+        iface.msg = iface_msg
 
         class SetParametersResult:
             def __init__(self, successful=True, reason=""):
                 self.successful = successful
                 self.reason = reason
 
-        param_mod.SetParametersResult = SetParametersResult
+        iface_msg.SetParametersResult = SetParametersResult
         qos = _pkg("rclpy.qos")
         qos.QoSProfile = lambda *a, **k: None
         qos.DurabilityPolicy = SimpleNamespace(TRANSIENT_LOCAL=1)
