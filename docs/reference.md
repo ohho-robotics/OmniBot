@@ -17,7 +17,7 @@ Detailed notes moved from the top-level README. Back to [README](../README.md).
 | OpenVLA / SmolVLA weights | GPU | [vla_engine/README.md](../omnibot-ai-engines/vla_engine/README.md) and [requirements.txt](../omnibot-ai-engines/vla_engine/requirements.txt) (`torch`) |
 | Isaac Lab RL | GPU | [rl_engine/README.md](../omnibot-ai-engines/rl_engine/README.md) and [requirements.txt](../omnibot-ai-engines/rl_engine/requirements.txt) (`isaaclab`, `onnxruntime-gpu`) |
 | Android controller | Robot | [omnibot-android/](../omnibot-android/). Building it needs the Android SDK and JDK 17 ([`build.gradle.kts`](../omnibot-android/build.gradle.kts)), which is separate from a desktop GPU. |
-| Quest teleop | Robot | [omnibot-vr/](../omnibot-vr/). Unity **6000.5.2f1** is pinned in [`ProjectSettings/ProjectVersion.txt`](../omnibot-vr/ProjectSettings/ProjectVersion.txt). |
+| Quest teleop | Robot | Canonical app: [OhhO-VR](https://github.com/ohho-robotics/OhhO-VR). [omnibot-vr/](../omnibot-vr/) in this repo was retired under OHH-192. |
 
 
 ## Gazebo Harmonic simulation
