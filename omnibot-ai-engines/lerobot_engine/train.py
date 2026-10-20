@@ -324,99 +324,99 @@ def main():
     try:
         for epoch in range(1, args.num_epochs + 1):
             policy_model.train()
-        epoch_loss, n_batches = 0.0, 0
+            epoch_loss, n_batches = 0.0, 0
 
-        for batch_idx, batch in enumerate(train_loader):
-            batch = {
-                k: v.to(device) if hasattr(v, "to") else v for k, v in batch.items()
-            }
-            optimizer.zero_grad()
-            out = policy_model.forward(batch)
-            loss = out["loss"] if isinstance(out, dict) else out
-            loss.backward()
-            grad_norm = nn.utils.clip_grad_norm_(
-                policy_model.parameters(), args.grad_clip_norm
+            for batch_idx, batch in enumerate(train_loader):
+                batch = {
+                    k: v.to(device) if hasattr(v, "to") else v for k, v in batch.items()
+                }
+                optimizer.zero_grad()
+                out = policy_model.forward(batch)
+                loss = out["loss"] if isinstance(out, dict) else out
+                loss.backward()
+                grad_norm = nn.utils.clip_grad_norm_(
+                    policy_model.parameters(), args.grad_clip_norm
+                )
+                optimizer.step()
+                epoch_loss += loss.item()
+                n_batches += 1
+                global_step += 1
+
+                if batch_idx % 50 == 0:
+                    print(
+                        f"  Epoch {epoch:4d}/{args.num_epochs} | "
+                        f"Batch {batch_idx:4d}/{len(train_loader)} | "
+                        f"Loss: {loss.item():.6f}"
+                    )
+                    if wandb_run is not None:
+                        wandb.log(
+                            {
+                                "train/step_loss": loss.item(),
+                                "train/grad_norm": float(grad_norm),
+                                "train/step": global_step,
+                            },
+                            step=global_step,
+                        )
+
+            scheduler.step()
+            avg_loss = epoch_loss / max(n_batches, 1)
+            eval_loss = (
+                compute_eval_loss(policy_model, eval_loader, device)
+                if eval_loader and len(eval_loader.dataset) > 0
+                else float("nan")
             )
-            optimizer.step()
-            epoch_loss += loss.item()
-            n_batches += 1
-            global_step += 1
+            is_best = eval_loss < best_eval_loss
 
-            if batch_idx % 50 == 0:
-                print(
-                    f"  Epoch {epoch:4d}/{args.num_epochs} | "
-                    f"Batch {batch_idx:4d}/{len(train_loader)} | "
-                    f"Loss: {loss.item():.6f}"
+            if is_best:
+                best_eval_loss = eval_loss
+
+            print(
+                f"Epoch {epoch:4d}/{args.num_epochs} | "
+                f"Train: {avg_loss:.6f} | Eval: {eval_loss:.6f} | "
+                f"LR: {optimizer.param_groups[0]['lr']:.2e}"
+                + (" [BEST]" if is_best else "")
+            )
+
+            if wandb_run is not None:
+                wandb.log(
+                    {
+                        "train/epoch_loss": avg_loss,
+                        "eval/loss": eval_loss,
+                        "train/lr": optimizer.param_groups[0]["lr"],
+                        "eval/is_best": int(is_best),
+                        "epoch": epoch,
+                    },
+                    step=global_step,
+                )
+
+            if epoch % args.save_every == 0 or epoch == args.num_epochs:
+                ckpt_dir = save_checkpoint(
+                    policy_model, optimizer, scheduler, epoch, avg_loss, output_dir
                 )
                 if wandb_run is not None:
-                    wandb.log(
-                        {
-                            "train/step_loss": loss.item(),
-                            "train/grad_norm": float(grad_norm),
-                            "train/step": global_step,
-                        },
-                        step=global_step,
+                    artifact = wandb.Artifact(
+                        f"omnibot-{args.model}-ckpt",
+                        type="model",
+                        metadata={"epoch": epoch, "eval_loss": eval_loss},
                     )
+                    artifact.add_dir(str(ckpt_dir))
+                    wandb_run.log_artifact(artifact, aliases=[f"epoch-{epoch:04d}"])
 
-        scheduler.step()
-        avg_loss = epoch_loss / max(n_batches, 1)
-        eval_loss = (
-            compute_eval_loss(policy_model, eval_loader, device)
-            if eval_loader and len(eval_loader.dataset) > 0
-            else float("nan")
-        )
-        is_best = eval_loss < best_eval_loss
-
-        if is_best:
-            best_eval_loss = eval_loss
-
-        print(
-            f"Epoch {epoch:4d}/{args.num_epochs} | "
-            f"Train: {avg_loss:.6f} | Eval: {eval_loss:.6f} | "
-            f"LR: {optimizer.param_groups[0]['lr']:.2e}"
-            + (" [BEST]" if is_best else "")
-        )
-
-        if wandb_run is not None:
-            wandb.log(
-                {
-                    "train/epoch_loss": avg_loss,
-                    "eval/loss": eval_loss,
-                    "train/lr": optimizer.param_groups[0]["lr"],
-                    "eval/is_best": int(is_best),
-                    "epoch": epoch,
-                },
-                step=global_step,
-            )
-
-        if epoch % args.save_every == 0 or epoch == args.num_epochs:
-            ckpt_dir = save_checkpoint(
-                policy_model, optimizer, scheduler, epoch, avg_loss, output_dir
-            )
-            if wandb_run is not None:
-                artifact = wandb.Artifact(
-                    f"omnibot-{args.model}-ckpt",
-                    type="model",
-                    metadata={"epoch": epoch, "eval_loss": eval_loss},
-                )
-                artifact.add_dir(str(ckpt_dir))
-                wandb_run.log_artifact(artifact, aliases=[f"epoch-{epoch:04d}"])
-
-        if is_best:
-            best_dir = output_dir / "best"
-            best_dir.mkdir(parents=True, exist_ok=True)
-            if hasattr(policy_model, "save_pretrained"):
-                policy_model.save_pretrained(str(best_dir))
-            if wandb_run is not None:
-                best_artifact = wandb.Artifact(
-                    f"omnibot-{args.model}-best",
-                    type="model",
-                    metadata={"epoch": epoch, "eval_loss": eval_loss},
-                )
-                best_artifact.add_dir(str(best_dir))
-                wandb_run.log_artifact(
-                    best_artifact, aliases=["best", f"epoch-{epoch:04d}"]
-                )
+            if is_best:
+                best_dir = output_dir / "best"
+                best_dir.mkdir(parents=True, exist_ok=True)
+                if hasattr(policy_model, "save_pretrained"):
+                    policy_model.save_pretrained(str(best_dir))
+                if wandb_run is not None:
+                    best_artifact = wandb.Artifact(
+                        f"omnibot-{args.model}-best",
+                        type="model",
+                        metadata={"epoch": epoch, "eval_loss": eval_loss},
+                    )
+                    best_artifact.add_dir(str(best_dir))
+                    wandb_run.log_artifact(
+                        best_artifact, aliases=["best", f"epoch-{epoch:04d}"]
+                    )
 
     except Exception:
         print(f"\nTraining interrupted at epoch {epoch}")
