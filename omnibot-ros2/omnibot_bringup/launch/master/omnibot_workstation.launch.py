@@ -120,7 +120,7 @@ def generate_launch_description():
     # ── 2. SmolVLA unified 9-DOF policy ──────────────────────────────────────
     # Subscribes: /camera/wrist/image_raw, /camera/base/bev/image_raw,
     #             /arm/joint_states, /odom
-    # Publishes:  /arm/joint_commands → arm_cmd_mux on Pi
+    # Publishes:  /arm/joint_commands/policy → arm_cmd_mux on Pi
     #             /cmd_vel → cmd_vel_mux on Pi
     smolvla_node = Node(
         package="omnibot_lerobot",
