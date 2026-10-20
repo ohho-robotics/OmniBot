@@ -152,6 +152,42 @@ pip install -r omnibot-ai-engines/vla_engine/requirements.txt
 pip install -r omnibot-ai-engines/rl_engine/requirements.txt
 ```
 
+## Replay a run (MCAP + Foxglove)
+
+OmniBot records demo and telemetry runs into [MCAP](https://mcap.dev/) files via `rosbag2` with zstd compression, providing an honest 'Twin v0' replay and scrub capability without requiring proprietary simulators.
+
+### Record a run
+
+To record a run to MCAP:
+
+<!-- docs-test: skip ros -->
+```bash
+ros2 launch omnibot_bringup record.launch.py
+```
+
+Options:
+- `bag_path:=my_run`: Output directory / bag name (defaults to timestamped `rosbag2_YYYY_MM_DD-HH_mm_ss`).
+- `use_sim_time:=true`: Timestamp using simulation `/clock`.
+- `topics:="/tf /odom /scan ..."`: Override default topics.
+
+Default recorded topics:
+- `/tf`, `/tf_static`: Transform tree
+- `/odom`: Robot odometry and twist
+- `/scan`: 2D LaserScan
+- `/camera/*`: Front, wrist, BEV, and depth camera streams
+- `/agent/trace`, `/agent/loop_trace`: Agent loop decisions, tool calls, and verifier traces
+- `/imu`, `/imu/data`: Linear acceleration and angular velocity
+- `/rosout`: ROS logs
+
+### Replay in Foxglove Studio
+
+1. Open [Foxglove Studio](https://foxglove.dev/) (desktop app or [web app](https://app.foxglove.dev)).
+2. Choose **Open local file** and select the `.mcap` file.
+3. Import the checked-in layout: [`foxglove/omnibot_layout.json`](foxglove/omnibot_layout.json) (**Layout** &rarr; **Import from file...**).
+4. Scrub the timeline to inspect the 3D scene (`/tf`, `/odom`, `/scan`), camera feeds, odometry/IMU plots, mission status, and agent execution trace.
+
+Sample 30 s run MCAP: attached to GitHub releases (under 50 MB, replays directly in Foxglove Studio).
+
 ## Hardware (bill of materials)
 
 These are the parts referenced in this repo's code and docs. Prices are not yet documented. Help fill them in via [#19](https://github.com/ohho-robotics/OmniBot/issues/19).
