@@ -5,3 +5,6 @@ log/
 **/__pycache__/
 *.egg-info/
 *.pyc
+# ohho-gateway runtime TLS material and pairing tokens
+.ohho-gateway/
+.pytest_cache/
