@@ -14,7 +14,7 @@ Detailed notes moved from the top-level README. Back to [README](../README.md).
 | Nav2 + `slam_toolbox` in the Gazebo apartment world | Neither | [Nav2 + slam_toolbox in Gazebo](../README.md#nav2--slam_toolbox-in-gazebo-ohh-30), the [`nav-sim`](../.github/workflows/nav-sim.yml) workflow, and the committed [run log](../omnibot-ros2/omnibot_navigation/docs/nav_sim_runs_local_log.txt). Needs ROS 2 Jazzy and Gazebo Harmonic. |
 | Gazebo compose files | Neither | [docker-compose.yml](../omnibot-digital-twin/docker/docker-compose.yml) runs headless Gazebo. [docker-compose.gpu.yml](../omnibot-digital-twin/docker/docker-compose.gpu.yml) is an optional NVIDIA overlay. The docs-test job does not start compose. |
 | Gazebo Harmonic `sim.launch.py` | Neither | [sim.launch.py](../omnibot-ros2/omnibot_bringup/launch/sim.launch.py) and the `sim-smoke` job in [ci.yml](../.github/workflows/ci.yml). That job needs ROS 2 Jazzy and Gazebo Harmonic. The launch does not exit, so docs-test skips it. |
-| OpenVLA / SmolVLA weights | GPU | [vla_engine/README.md](../omnibot-ai-engines/vla_engine/README.md) and [requirements.txt](../omnibot-ai-engines/vla_engine/requirements.txt) (`torch`) |
+| OmniVLA engine (`vla_engine`) / OpenVLA / SmolVLA weights | GPU for real inference | [vla_engine/README.md](../omnibot-ai-engines/vla_engine/README.md), editable `pip install -e "omnibot-ai-engines/vla_engine[serve,gpu]"`, and the `vla-engine` job in [ci.yml](../.github/workflows/ci.yml) (CPU torch, mocked server tests) |
 | Isaac Lab RL | GPU | [rl_engine/README.md](../omnibot-ai-engines/rl_engine/README.md) and [requirements.txt](../omnibot-ai-engines/rl_engine/requirements.txt) (`isaaclab`, `onnxruntime-gpu`) |
 | Android controller | Robot | [omnibot-android/](../omnibot-android/). Building it needs the Android SDK and JDK 17 ([`build.gradle.kts`](../omnibot-android/build.gradle.kts)), which is separate from a desktop GPU. |
 | Quest teleop | Robot | [omnibot-vr/](../omnibot-vr/). Unity **6000.5.2f1** is pinned in [`ProjectSettings/ProjectVersion.txt`](../omnibot-vr/ProjectSettings/ProjectVersion.txt). |
@@ -83,7 +83,7 @@ ros2 launch omnibot_bringup sim.launch.py world:=flat
 The requirement files below pull GPU stacks. Docs-test skips them.
 
 ```bash
-pip install -r omnibot-ai-engines/vla_engine/requirements.txt
+pip install -e "omnibot-ai-engines/vla_engine[serve,gpu]"
 pip install -r omnibot-ai-engines/rl_engine/requirements.txt
 ```
 

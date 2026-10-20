@@ -144,11 +144,11 @@ Changes to [`nav2_params.yaml`](omnibot-ros2/omnibot_navigation/config/nav2_para
 
 Not covered: `drive:=mecanum` (wheel-physics) with Nav2 was tried once and the `map` frame never appeared before Nav2's startup timeout, so `sim_navigation.launch.py` uses the planar holonomic drive only. The 3-D RTAB-Map stack, real-robot SLAM/Nav2, and bags are untouched.
 
-GPU policy stacks (OpenVLA / SmolVLA, Isaac Lab RL) need a desktop NVIDIA GPU, not the Raspberry Pi:
+GPU policy stacks (OmniVLA engine / OpenVLA / SmolVLA, Isaac Lab RL) need a desktop NVIDIA GPU, not the Raspberry Pi. The OmniVLA engine Python package is `vla_engine` ([README](omnibot-ai-engines/vla_engine/README.md)); CI runs its FastAPI tests with CPU torch.
 
 <!-- docs-test: skip gpu -->
 ```bash
-pip install -r omnibot-ai-engines/vla_engine/requirements.txt
+pip install -e "omnibot-ai-engines/vla_engine[serve,gpu]"
 pip install -r omnibot-ai-engines/rl_engine/requirements.txt
 ```
 
