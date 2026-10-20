@@ -11,12 +11,15 @@ lidar, the front RGB camera, and the IMU. ros_gz_bridge bridges:
 
     /cmd_vel  /odom  /scan  /imu  /camera/front/image_raw
     /camera/front/camera_info  /clock
+    /arm/sim/joint_states  /arm/sim/<joint>/cmd_pos
 
 `rosbridge:=true` (the default) also starts rosbridge_websocket on port 9090
 bound to 127.0.0.1 so a browser on this machine can drive this stack.
 `rosbridge_address:=0.0.0.0` exposes it on the network without authentication.
 The sim-smoke test passes `rosbridge:=false` and does not start rosbridge.
-This launch does not start foxglove or the arm driver.
+`arm:=true` (the default) starts arm_sim_driver, which consumes
+/arm/joint_commands/out, applies arm_safety, and publishes /arm/joint_states.
+This launch does not start foxglove, arm_cmd_mux, or the Feetech arm driver.
 
 `drive:=mecanum` selects the gz-sim MecanumDrive plugin instead of planar move.
 `gui:=true` opens the Gazebo client; the default is server-only so CI has no display.
@@ -134,6 +137,28 @@ def _launch_sim(context, *args, **kwargs):
     )
 
     actions = [gazebo, robot_state_publisher, spawn, bridge]
+    arm_on = LaunchConfiguration("arm").perform(context).lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if arm_on:
+        arm_share = FindPackageShare("omnibot_arm").perform(context)
+        arm_params = os.path.join(arm_share, "config", "arm_params.yaml")
+        actions.append(
+            Node(
+                package="omnibot_arm",
+                executable="arm_sim_driver_node.py",
+                name="arm_sim_driver_node",
+                output="screen",
+                parameters=[
+                    {
+                        "arm_params_file": arm_params,
+                        "use_sim_time": False,
+                    }
+                ],
+            )
+        )
     rosbridge_on = LaunchConfiguration("rosbridge").perform(context).lower() in (
         "1",
         "true",
@@ -170,6 +195,15 @@ def generate_launch_description():
                 "gui",
                 default_value="false",
                 description="Open the Gazebo GUI. Default is headless.",
+            ),
+            DeclareLaunchArgument(
+                "arm",
+                default_value="true",
+                description=(
+                    "Start arm_sim_driver. It reads arm_params.yaml and "
+                    "commands the SO-101 joints in Gazebo. "
+                    "Set false for a base-only launch."
+                ),
             ),
             DeclareLaunchArgument(
                 "rosbridge",
