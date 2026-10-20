@@ -297,6 +297,7 @@ omnibot-vr/
 | Hand mesh offset from real hand | Fixed in this branch — hand skeletons update root pose/scale/bone translations; re-run **OmniBot → Rebuild Unified OhhO Screen** if it regresses |
 | Hand visible in one eye only | Fixed in this branch — hand meshes use `updateWhenOffscreen` so per-eye frustum culling can't drop them |
 | Camera feed shows "No Signal" | Ensure `web_video_server` is running: `ros2 run web_video_server web_video_server` |
+| Quest cannot open a sim that is running in WSL2 on Windows | Use [Quest to WSL2 networking](../docs/vr-sim-network-windows.md). Browser video is `http://<pc-ip>:8080`; the VR app uses `ws://<pc-ip>:9090` |
 | Export fails | The headset posts to port 8765 ([`TeleopHudController.cs`](Assets/Scripts/UI/TeleopHudController.cs)). This repository has no `omnibot_vr` launch file serving that port. |
 | Arm not moving | Toggle arm enable with left-hand thumbs-up, check `/arm/enable` topic |
 | UI looks low-res | `VRGraphicsBoost` sets 1.5× eye resolution at startup; check it exists on `[OhhO VR App]` |
