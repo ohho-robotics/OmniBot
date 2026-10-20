@@ -247,6 +247,10 @@ Details: control-mode gating in [docs/reference.md](docs/reference.md#bring-up-c
 - [ ] WebRTC video for the Quest client (MJPEG today)
 - [ ] First tagged release, v0.1.0
 
+## VR profile tag (not yet tagged)
+
+The Quest client lives in [OhhO-VR](https://github.com/ohho-robotics/OhhO-VR), not in a second Unity tree on this commit. The Gazebo VR launch (`sim_vr.launch.py`), the real-robot VR launch (`robot_vr.launch.py`), and the GPU sim compose file are on other branches. They are not in `origin/main` (`d296c9be6cc898e11e8f671c2457292b30cec905`). The intended git tag is `vr-profile-v1.0.0`. It is not yet tagged. The intended sim image name `ghcr.io/ohho-robotics/omnibot-sim:vr-1.0.0` is a placeholder and is not published. Notes and the human commands: [CHANGELOG.md](CHANGELOG.md), [docs/releases/vr-profile-tag-commands.md](docs/releases/vr-profile-tag-commands.md).
+
 ## Contributing & community
 
 New here? Pick a [**good first issue**](https://github.com/ohho-robotics/OmniBot/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or a [**help wanted**](https://github.com/ohho-robotics/OmniBot/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) issue. Questions, build photos and ideas go in [**Discussions**](https://github.com/ohho-robotics/OmniBot/discussions). Contribution guidelines and the code of conduct live in the [org `.github` repo](https://github.com/ohho-robotics/.github).
