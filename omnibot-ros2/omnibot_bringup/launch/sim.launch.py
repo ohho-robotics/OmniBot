@@ -105,6 +105,10 @@ def _launch_sim(context, *args, **kwargs):
         parameters=[{"robot_description": robot_desc, "use_sim_time": True}],
     )
 
+    spawn_x = LaunchConfiguration("spawn_x").perform(context)
+    spawn_y = LaunchConfiguration("spawn_y").perform(context)
+    spawn_yaw = LaunchConfiguration("spawn_yaw").perform(context)
+
     spawn = TimerAction(
         period=2.0,
         actions=[
@@ -118,11 +122,13 @@ def _launch_sim(context, *args, **kwargs):
                     "-topic",
                     "robot_description",
                     "-x",
-                    "0",
+                    spawn_x,
                     "-y",
-                    "0",
+                    spawn_y,
                     "-z",
                     "0.05",
+                    "-Y",
+                    spawn_yaw,
                 ],
             )
         ],
@@ -222,6 +228,13 @@ def generate_launch_description():
                     "127.0.0.1 is loopback only. "
                     "0.0.0.0 exposes it on the network without authentication."
                 ),
+            ),
+            DeclareLaunchArgument("spawn_x", default_value="0"),
+            DeclareLaunchArgument("spawn_y", default_value="0"),
+            DeclareLaunchArgument(
+                "spawn_yaw",
+                default_value="0",
+                description="Spawn heading about +Z, radians",
             ),
             OpaqueFunction(function=_launch_sim),
         ]
