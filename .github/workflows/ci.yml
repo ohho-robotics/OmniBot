@@ -49,9 +49,16 @@ jobs:
     container: ros:jazzy-ros-base-noble
     timeout-minutes: 120
     steps:
-      - name: Install git and sudo
-        run: apt-get update && apt-get install -y git sudo ca-certificates
+      - name: Install git, sudo, and URDF validation tools
+        run: apt-get update && apt-get install -y git sudo ca-certificates liburdfdom-tools ros-jazzy-xacro
       - uses: actions/checkout@v4
+      - name: Validate the robot description
+        shell: bash
+        run: |
+          set -eo pipefail
+          source /opt/ros/jazzy/setup.bash
+          xacro omnibot-ros2/omnibot_description/urdf/omnibot.urdf.xacro > /tmp/omnibot.urdf
+          check_urdf /tmp/omnibot.urdf
       - name: ROS 2 quick start from the README
         shell: bash
         run: |
