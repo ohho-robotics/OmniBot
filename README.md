@@ -238,6 +238,10 @@ flowchart LR
 
 Details: control-mode gating in [docs/reference.md](docs/reference.md#bring-up-control-mode), arm and policy safety in [docs/safety.md](docs/safety.md). October pick-and-place fill-in: [docs/october-task.md](docs/october-task.md).
 
+## Observability (1 robot)
+
+Prometheus, alert rules, Grafana dashboards, and Loki compose stack live in [`infra/observability/`](infra/observability/). Configs are validated headlessly; live robot verification and dated dashboard capture are a TODO for Varun on hardware. See [`infra/observability/README.md`](infra/observability/README.md).
+
 ## Roadmap
 
 - [ ] Nav2 + slam_toolbox in Gazebo with named waypoints (in review: [#18](https://github.com/ohho-robotics/OmniBot/pull/18))
@@ -269,6 +273,7 @@ Demos and updates: [YouTube](https://www.youtube.com/@varun.vaidhiya/videos) · 
 | [`yahboom-python-driver/`](yahboom-python-driver/) | Yahboom serial protocol |
 | [`ros2-bev-stitcher/`](ros2-bev-stitcher/) | Bird's-eye homography |
 | [`omnibot-digital-twin/`](omnibot-digital-twin/) | Gazebo world and compose files |
+| [`infra/observability/`](infra/observability/) | Prometheus, Grafana dashboards, alert rules, and Loki stack |
 | [`omnibot-android/`](omnibot-android/) | Kotlin controller |
 | [`omnibot-vr/`](omnibot-vr/) | Unity Quest project |
 
