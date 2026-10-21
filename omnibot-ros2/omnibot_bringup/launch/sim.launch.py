@@ -188,6 +188,28 @@ def _launch_sim(context, *args, **kwargs):
     )
 
     actions = [gazebo, robot_state_publisher, spawn, bridge]
+    descriptor_on = LaunchConfiguration("descriptor").perform(context).lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if descriptor_on:
+        actions.append(
+            Node(
+                package="omnibot_bringup",
+                executable="descriptor_node.py",
+                name="ohho_descriptor",
+                output="screen",
+                parameters=[
+                    {
+                        "descriptor_yaml": os.path.join(
+                            bringup, "config", "robot_descriptor.yaml"
+                        ),
+                        "kind": "sim",
+                    }
+                ],
+            )
+        )
     arm_on = LaunchConfiguration("arm").perform(context).lower() in (
         "1",
         "true",
@@ -276,6 +298,11 @@ def generate_launch_description():
                     "rosbridge_address (127.0.0.1 by default). "
                     "The sim-smoke test sets this false."
                 ),
+            ),
+            DeclareLaunchArgument(
+                "descriptor",
+                default_value="true",
+                description="Publish the latched RobotDescriptor JSON on /ohho/descriptor",
             ),
             DeclareLaunchArgument(
                 "rosbridge_address",
