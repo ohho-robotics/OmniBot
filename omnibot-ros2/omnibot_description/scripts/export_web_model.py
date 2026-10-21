@@ -200,6 +200,28 @@ def _expand_xacro(xacro_path: Path, mappings: dict[str, str]) -> ET.Element:
     return root
 
 
+def _drop_nominal_apriltag_mounts(robot: ET.Element) -> None:
+    """Leave tag36h11 cards in the Gazebo model and out of the browser URDF.
+
+    Those links are meshes for headset detection. This export converts only
+    the SO-101 STLs and keeps the chassis as primitives.
+    """
+    for element in list(robot):
+        kind = _local(element.tag)
+        if kind == "link" and element.attrib.get("name", "").startswith("apriltag_"):
+            robot.remove(element)
+            continue
+        if kind != "joint":
+            continue
+        names = [element.attrib.get("name", "")]
+        for role in ("parent", "child"):
+            node = element.find(role)
+            if node is not None:
+                names.append(node.attrib.get("link", ""))
+        if any(name.startswith("apriltag_") for name in names):
+            robot.remove(element)
+
+
 def _strip_gazebo(robot: ET.Element) -> None:
     for child in list(robot):
         if _local(child.tag) == "gazebo":
@@ -526,12 +548,14 @@ def export_web_model(
     args = dict(WEB_XACRO_ARGS if xacro_args is None else xacro_args)
     _wipe_output(output_dir)
     robot = _expand_xacro(xacro_path, args)
+    _drop_nominal_apriltag_mounts(robot)
     robot.insert(
         0,
         ET.Comment(
             " Browser model for three.js urdf-loader. "
             "Gazebo plugins removed. Arm visuals are decimated SO-101 GLBs. "
             "Chassis, wheels, and cameras stay box/cylinder primitives. "
+            "Nominal AprilTag cards stay in the Gazebo model only. "
         ),
     )
     _strip_gazebo(robot)

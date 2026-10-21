@@ -1260,4 +1260,6 @@
         </gazebo>
     </xacro:if>
 
+  <xacro:include filename="apriltags.urdf.xacro"/>
+
 </robot>

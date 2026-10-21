@@ -6,7 +6,7 @@ URDF for the OmniBot mecanum base and SO-101 arm (`urdf/omnibot.urdf.xacro`).
 
 The browser console (Garage → Add robot → OmniBot Pro → Connect → Simulation) will load this robot with three.js `urdf-loader`. This package only builds the files. Rendering them is a separate console change; nothing in the console repo is modified here.
 
-The chassis, standoffs, wheels, and cameras are box and cylinder primitives in the xacro. There is no base CAD, and this export does not invent any. `urdf-loader` draws those primitives. The SO-101 STL meshes in `meshes/so101/` are real. The xacro still shows the arm as primitives so Gazebo stays light; the web export swaps those arm visuals for the meshes, using the visual origins from `so101_new_calib.urdf` (the same joint frames the xacro already copies).
+The chassis, standoffs, wheels, and cameras are box and cylinder primitives in the xacro. There is no base CAD, and this export does not invent any. Nominal tag36h11 cards in `urdf/apriltags.urdf.xacro` stay on the Gazebo model and are omitted here. `urdf-loader` draws those primitives. The SO-101 STL meshes in `meshes/so101/` are real. The xacro still shows the arm as primitives so Gazebo stays light; the web export swaps those arm visuals for the meshes, using the visual origins from `so101_new_calib.urdf` (the same joint frames the xacro already copies).
 
 ### Tooling
 
