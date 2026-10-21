@@ -22,8 +22,9 @@ jobs:
             -e omnibot-ai-engines/learning_engine \
             -e omnibot-ai-engines/agent_engine \
             -e yahboom-python-driver \
-            pytest numpy pyarrow click pyyaml ruff aiortc \
+            pytest numpy pyarrow click pyyaml ruff pandas aiortc \
             xacro trimesh fast-simplification
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Ruff
         run: ruff check .
       - name: CPU suites
