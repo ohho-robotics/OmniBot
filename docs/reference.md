@@ -31,7 +31,7 @@ source install/setup.bash
 ros2 launch omnibot_bringup sim.launch.py world:=flat
 ```
 
-`world:=apartment` loads a single room with a kitchen (counter, stove, fridge), a desk, and a door. A dynamic `grasp_cube` sits on the desk for dataset tasks. Launch file: [`omnibot-ros2/omnibot_bringup/launch/sim.launch.py`](../omnibot-ros2/omnibot_bringup/launch/sim.launch.py). The mecanum chassis is driven in the plane (`drive:=planar` by default; `drive:=mecanum` selects the MecanumDrive plugin). Sensors in this launch are a 2D lidar, the front RGB camera, and the IMU.
+`world:=apartment` loads a single room with a kitchen (counter, stove, fridge), a desk, and a door. A dynamic `grasp_cube` sits on the desk for dataset tasks. Launch file: [`omnibot-ros2/omnibot_bringup/launch/sim.launch.py`](../omnibot-ros2/omnibot_bringup/launch/sim.launch.py). The mecanum chassis is driven in the plane (`drive:=planar` by default; `drive:=mecanum` selects the MecanumDrive plugin). With `vr:=false` (the default, including sim-smoke) the sensors are a 2D lidar, a small front RGB camera, and the IMU.
 
 `arm:=true` (the default) starts [`arm_sim_driver_node`](../omnibot-ros2/omnibot_arm/scripts/arm_sim_driver_node.py). It reads [`arm_params.yaml`](../omnibot-ros2/omnibot_arm/config/arm_params.yaml) and applies `arm_safety.py` — the same joint limits, 0.15 rad per-command cap, 0.2 s command-timeout hold, and e-stop latch as the Feetech driver. Each arm joint, including `arm_gripper`, has a gz-sim `JointPositionController`. Measured joints are republished on `/arm/joint_states` with those URDF names. This launch does not start `arm_cmd_mux` or `arm_driver_node`, so command the arm on `/arm/joint_commands/out`. `/emergency_stop` true freezes the sim joints at the measured pose and rejects later commands until `/arm/enable` true while the stop is clear.
 
@@ -61,6 +61,18 @@ ros2 run omnibot_arm arm_sim_scripted_move.py
 ROS topics that are not bridged: `/arm/joint_commands/out` and `/arm/enable` and `/emergency_stop` go to `arm_sim_driver`, which publishes `/arm/joint_states`.
 
 Bridge config: [`omnibot-ros2/omnibot_bringup/config/sim_bridge.yaml`](../omnibot-ros2/omnibot_bringup/config/sim_bridge.yaml).
+
+### VR cameras (`vr:=true`)
+
+`vr:=true` is the Quest camera profile. It keeps `minimal_sensors` (the depth camera and the four fisheyes stay off) and adds three sensors at 960×540, 30 Hz: a wrist camera on the SO-101 gripper link, a synthetic top-down camera publishing `/camera/base/bev/image_raw`, and a chase camera fixed behind `base_link` publishing `/sim/chase_cam/image_raw`. The front camera is raised to the same size. `video:=true` (the default) starts `web_video_server` on port 8080, bound to `rosbridge_address` (127.0.0.1 unless you set it).
+
+```bash
+ros2 launch omnibot_bringup sim.launch.py world:=apartment vr:=true
+```
+
+Chase view, once the server is up: `http://<host>:8080/stream?topic=/sim/chase_cam/image_raw`. The same server also serves `/camera/front/image_raw`, `/camera/wrist/image_raw`, and `/camera/base/bev/image_raw`. Extra bridge: [`sim_bridge_cameras.yaml`](../omnibot-ros2/omnibot_bringup/config/sim_bridge_cameras.yaml).
+
+`gui:=false` (the default) passes `-s --headless-rendering` so those cameras render without a Gazebo window. `gui:=true` drops that flag and opens the client. The sensors are `always_on`, so the GPU cost is paid even when no browser is connected. `web_video_server` encodes a topic only while a client holds the stream. The GPU delta was not measured here (no Gazebo install). This flag does not start `teleop_safety`.
 
 The headless launch test [`omnibot-ros2/omnibot_bringup/test/test_sim_launch.py`](../omnibot-ros2/omnibot_bringup/test/test_sim_launch.py) checks that `/odom`, `/scan`, `/imu`, and `/camera/front/image_raw` publish within 30 s and that `/cmd_vel` moves the robot at least 0.2 m. The same launch runs [`arm_sim_scripted_move.py`](../omnibot-ros2/omnibot_arm/scripts/arm_sim_scripted_move.py), which moves each arm joint to a target within 0.08 rad and checks that `/emergency_stop` holds that pose. The `sim-smoke` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs it on `ros:jazzy`.
 
