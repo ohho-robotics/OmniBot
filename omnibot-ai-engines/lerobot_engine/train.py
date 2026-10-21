@@ -333,12 +333,23 @@ def save_checkpoint(policy_model, optimizer, scheduler, epoch, loss, output_dir)
     return ckpt_dir
 
 
+def _value_for_device(value, device):
+    """Move tensors to device. Leave text as-is. Convert other numeric values."""
+    if hasattr(value, "to"):
+        return value.to(device)
+    if isinstance(value, (str, bytes)):
+        return value
+    if isinstance(value, (list, tuple)) and value and isinstance(value[0], (str, bytes)):
+        return value
+    try:
+        return torch.as_tensor(value, device=device)
+    except (TypeError, ValueError, RuntimeError):
+        return value
+
+
 def prepare_batch(batch: dict[str, Any], device, adapter) -> dict[str, Any]:
     """Prepare batch tensors: move to device, pad actions, synthesize missing images."""
-    prepared = {
-        k: v.to(device) if hasattr(v, "to") else torch.as_tensor(v, device=device)
-        for k, v in batch.items()
-    }
+    prepared = {k: _value_for_device(v, device) for k, v in batch.items()}
 
     # ACT and other transformers require 'action_is_pad'
     if "action_is_pad" not in prepared and "action" in prepared:
@@ -575,7 +586,7 @@ def main():
                 if isinstance(out, tuple):
                     loss = out[0]
                 elif isinstance(out, dict):
-                    loss = out.get("loss", next(iter(out.values())))
+                    loss = out["loss"] if "loss" in out else next(iter(out.values()))
                 else:
                     loss = out
 
@@ -588,7 +599,8 @@ def main():
                 n_batches += 1
                 global_step += 1
 
-                if batch_idx % max(1, len(train_loader) // 5) == 0:
+                log_every = max(1, len(train_loader) // 5)
+                if batch_idx % 50 == 0 or batch_idx % log_every == 0:
                     print(
                         f"  Epoch {epoch:4d}/{args.num_epochs} | "
                         f"Batch {batch_idx:4d}/{len(train_loader)} | "
@@ -606,11 +618,16 @@ def main():
 
             scheduler.step()
             avg_loss = epoch_loss / max(n_batches, 1)
-            eval_loss = (
-                compute_eval_loss(policy_model, eval_loader, device, adapter, max_steps=args.max_steps)
-                if eval_loader and len(eval_loader.dataset) > 0
-                else avg_loss
-            )
+            # Full runs with no eval split stay NaN. Step-capped smoke runs fall
+            # back to the training loss so a best checkpoint is still written.
+            if eval_loader and len(eval_loader.dataset) > 0:
+                eval_loss = compute_eval_loss(
+                    policy_model, eval_loader, device, adapter, max_steps=args.max_steps
+                )
+            elif args.max_steps is not None:
+                eval_loss = avg_loss
+            else:
+                eval_loss = float("nan")
             is_best = eval_loss < best_eval_loss
 
             if is_best:
