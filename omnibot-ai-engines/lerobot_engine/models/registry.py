@@ -43,6 +43,7 @@ def make_policy(
     model_type: str,
     checkpoint: str,
     device: str = "cuda",
+    **kwargs: object,
 ) -> PolicyAdapter:
     """Instantiate and load a policy adapter by registry name.
 
@@ -63,5 +64,8 @@ def make_policy(
             f"Unknown model type '{model_type}'. Registered: {list_models()}"
         )
     adapter = _REGISTRY[model_type]()
+    for key in ("serve_url", "timeout_sec", "api_key"):
+        if key in kwargs:
+            setattr(adapter, key, kwargs[key])
     adapter.load(checkpoint, device)
     return adapter
