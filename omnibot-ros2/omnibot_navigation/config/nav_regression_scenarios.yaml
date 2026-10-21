@@ -25,11 +25,20 @@ scenarios:
       size: {x: 0.30, y: 0.40, z: 0.45}
 
   - id: origin_to_door
-    start: {x: 0.0, y: 0.0, yaw_deg: 0.0}
+    # North of the hall box, already facing the door. Spawn at the origin
+    # would sit 0.10 m from this box (inside the footprint).
+    start: {x: 0.0, y: 1.0, yaw_deg: -90.0}
+    # Same pose as the door waypoint in waypoints.yaml (the nav-sim "door" run).
     goal: {x: -0.3, y: -1.45, yaw_deg: -90.0}
     obstacle:
       name: south_hall_box
-      pose: {x: -0.05, y: -0.75, yaw_deg: 0.0}
+      # y=-0.50 put the box's west face 0.08 m from the goal x, so the last
+      # metre was a side-step between that box and the door leaf (0.54 m
+      # south of the goal, on the 0.55 m inflation). On a slow runner DWB
+      # was still northwest of the goal at 60 s with yaw error ~0.59 rad.
+      # y=-0.25 stays across the origin-to-door segment, 1.1 m from this
+      # start and 1.05 m from the goal, with a clear southbound run in.
+      pose: {x: -0.05, y: -0.25, yaw_deg: 0.0}
       size: {x: 0.35, y: 0.30, z: 0.45}
 
   - id: north_to_kitchen
