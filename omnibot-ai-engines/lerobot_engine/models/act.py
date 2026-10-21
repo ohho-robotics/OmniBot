@@ -19,11 +19,16 @@ except ImportError:
     TORCH_AVAILABLE = False
 
 try:
-    from lerobot.common.policies.act.modeling_act import ACTPolicy
+    from lerobot.policies.act.modeling_act import ACTPolicy
 
     LEROBOT_ACT_AVAILABLE = True
 except ImportError:
-    LEROBOT_ACT_AVAILABLE = False
+    try:
+        from lerobot.common.policies.act.modeling_act import ACTPolicy
+
+        LEROBOT_ACT_AVAILABLE = True
+    except ImportError:
+        LEROBOT_ACT_AVAILABLE = False
 
 
 @register("act")

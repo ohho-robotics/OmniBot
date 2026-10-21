@@ -60,6 +60,26 @@ Key flags: `--model`, `--checkpoint` (pretrained hub id or path), `--dataset-pat
 `--chunk-size`, `--save-every`, `--grad-clip-norm`, `--num-workers`,
 `--wandb-project`, `--wandb-run-name`.
 
+## ACT on the VR sim pick dataset (OHH-243)
+
+Config: `configs/act_vr_sim_pick.yaml`. It points at the OHH-237 LeRobot v2
+root `/tmp/omnibot-sim-vr-pick` (`local/omnibot-sim-vr-pick`). That directory
+is not in git. The Hugging Face dataset `ohho-robotics/omnibot-sim-vr-pick`
+is not published. See `docs/act-vr-sim-pick.md` for the human push steps.
+
+CPU smoke (synthetic chunks, no W&B, not LeRobot ACT weights):
+
+```bash
+python omnibot-ai-engines/lerobot_engine/train_act_vr.py --smoke
+```
+
+Serve that checkpoint through the mux without leaving teleop until the
+headset confirms:
+
+```bash
+ros2 launch omnibot_lerobot act_vr_sim_pick.launch.py
+```
+
 ## Record (standalone, no ROS)
 
 ```bash
