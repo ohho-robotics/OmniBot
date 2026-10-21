@@ -39,21 +39,26 @@ omnibot-digital-twin/
 
 ### Option A — VS Code DevContainer
 
-Roadmap. This repo has no `.devcontainer/devcontainer.json`. Do not expect "Reopen in Container" to work.
+Open this repository in VS Code with the Dev Containers extension installed and select **Reopen in Container**. The DevContainer configuration lives in [`.devcontainer/devcontainer.json`](../../.devcontainer/devcontainer.json) based on `Dockerfile.sim`, pre-building the ROS 2 workspace, configuring headless software rendering, and forwarding ports 8765 (Foxglove), 9090 (ROSBridge), and 8080 (Web Video Server).
 
 ### Option B — Docker Compose (headless)
 
-The compose file builds `omnibot-digital-twin/docker/Dockerfile.sim` and sources `install/setup.bash` from a colcon build at the repo root. Image build pulls Gazebo and Nav2 and is not part of the GitHub Actions CPU job.
+The compose file uses the published GHCR image (`ghcr.io/ohho-robotics/omnibot-sim:latest`) with automatic local build fallback from `Dockerfile.sim`. It includes prebuilt workspace packages, headless Gazebo Harmonic, Nav2 autonomous navigation, and the Foxglove bridge.
+
+From the repository root:
 
 ```bash
-docker compose -f omnibot-digital-twin/docker/docker-compose.yml up
+docker compose up sim
 ```
 
-NVIDIA hosts can add `-f omnibot-digital-twin/docker/docker-compose.gpu.yml`. Foxglove, if that service starts, listens on `ws://localhost:8765`.
+Or targeting this directory directly:
 
-The compose `sim` service launches `simulation.launch.py rviz:=false foxglove:=false`
-and runs `foxglove_bridge` as a separate service; ROSBridge (port 9090) is exposed
-for the Android app.
+```bash
+docker compose -f omnibot-digital-twin/docker/docker-compose.yml up sim
+```
+
+NVIDIA hosts can add `-f omnibot-digital-twin/docker/docker-compose.gpu.yml`. The Foxglove bridge listens on `ws://localhost:8765`, and ROSBridge listens on port 9090.
+
 
 ### Option C — Native Ubuntu 24.04
 ```bash
