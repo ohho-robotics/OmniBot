@@ -1,6 +1,11 @@
-# OmniBot simulation image (CPU-only, headless Gazebo Harmonic + Nav2 + workspace)
+# OmniBot simulation image (headless Gazebo Harmonic + Nav2 + workspace)
 # Base: ROS 2 Jazzy on Ubuntu 24.04 (Noble)
 # Published to GHCR: ghcr.io/ohho-robotics/omnibot-sim
+#
+# The image default is CPU software rendering (llvmpipe). CI and
+# docker-compose.yml rely on that. docker-compose.gpu.yml overrides it at
+# runtime for Ogre2 EGL on an NVIDIA GPU. Do not flip LIBGL_ALWAYS_SOFTWARE
+# here.
 
 FROM ros:jazzy-ros-base-noble
 
@@ -17,12 +22,17 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ── 1. System packages & dependencies ──────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
     locales \
-    # Headless software rendering (Mesa + llvmpipe + xvfb)
+    # Headless software rendering (Mesa + llvmpipe + xvfb).
+    # libglvnd0 is the dispatcher the NVIDIA Container Toolkit uses to
+    # hand EGL to the host driver when the GPU compose file selects it.
     libgl1-mesa-dri \
     libegl1 \
     libegl-mesa0 \
     libglx-mesa0 \
     libglu1-mesa \
+    libglvnd0 \
+    libgl1 \
+    libgles2 \
     xvfb \
     # ROS 2 desktop (includes RViz2, rqt)
     ros-jazzy-desktop \
@@ -38,6 +48,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Visualization & telemetry bridges
     ros-jazzy-foxglove-bridge \
     ros-jazzy-rosbridge-suite \
+    ros-jazzy-web-video-server \
     ros-jazzy-depthimage-to-laserscan \
     ros-jazzy-teleop-twist-keyboard \
     ros-jazzy-topic-tools \
