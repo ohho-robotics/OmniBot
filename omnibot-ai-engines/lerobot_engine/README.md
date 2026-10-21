@@ -89,6 +89,19 @@ python lerobot_engine/record.py     # RB = start/stop, LB = discard
 For the full ROS-integrated recording workflow (leader arm + base + ROS topics),
 use `ros2 launch omnibot_lerobot teleop_record.launch.py` instead.
 
+## Compare VR and leader-arm datasets
+
+`tools/compare_dataset_quality.py` scores two LeRobot v2 roots and writes a
+markdown table plus JSON: action jerk, action smoothness, wrist/BEV timestamp
+skew, frame drops, time per episode, and OHH-99 quality-filter keep/reject
+counts. It does not record and does not upload. Real VR and leader episodes
+are not in this repo. The empty table and the commands to run after recording
+are in [`docs/vr-vs-leader-quality.md`](../../docs/vr-vs-leader-quality.md).
+
+```bash
+python omnibot-ai-engines/lerobot_engine/tools/compare_dataset_quality.py --help
+```
+
 ## Inference test (standalone, no ROS)
 
 ```bash

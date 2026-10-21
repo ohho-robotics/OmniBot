@@ -37,3 +37,5 @@ teleop_recorder_node:
     episode_timeout_s: 60.0
     joy_record_button: 7   # Xbox RB
     joy_discard_button: 6  # Xbox LB
+    task_name: "mobile manipulation task"
+    episode_index: -1      # -1 = next index; >= 0 pins that index on every start
