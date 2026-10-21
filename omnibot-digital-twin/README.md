@@ -57,13 +57,13 @@ Or targeting this directory directly:
 docker compose -f omnibot-digital-twin/docker/docker-compose.yml up sim
 ```
 
-The CPU file above forces llvmpipe. For the RTX 5060 Ti VR profile (Ogre2 EGL, three cameras, rosbridge on 9090 and web_video_server on 8080, both published on 127.0.0.1), run the GPU file on its own:
+The CPU file above forces llvmpipe. The Foxglove bridge listens on `ws://localhost:8765`, and ROSBridge listens on port 9090. For the RTX 5060 Ti VR profile (Ogre2 EGL, three cameras, rosbridge on 9090 and web_video_server on 8080, both published on 127.0.0.1), run the GPU file on its own:
 
 ```bash
 docker compose -f omnibot-digital-twin/docker/docker-compose.gpu.yml up sim-vr
 ```
 
-That starts `sim_vr.launch.py` (`world:=apartment`, `vr:=true`, `gui:=false`). Do not add this file on top of the CPU compose file. The Foxglove bridge from the CPU file listens on `ws://localhost:8765`, and that file's ROSBridge port is 9090.
+That starts `sim_vr.launch.py` (`world:=apartment`, `vr:=true`, `gui:=false`). Do not add this file on top of the CPU compose file.
 
 
 ### Option C — Native Ubuntu 24.04
