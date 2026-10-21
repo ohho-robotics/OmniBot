@@ -41,7 +41,7 @@
 
 ## Quickstart (no robot, no GPU)
 
-[`ohho-os`](https://pypi.org/project/ohho-os/) is on PyPI under [Apache-2.0](https://github.com/ohho-robotics/ohho-sdk/blob/main/LICENSE). The docs-test job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs these three commands in a fresh virtualenv via [`scripts/docs_test_readme.py`](scripts/docs_test_readme.py).
+[`ohho-os`](https://pypi.org/project/ohho-os/) is on PyPI under [Apache-2.0](https://github.com/ohho-robotics/ohho-os/blob/main/LICENSE). The docs-test job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs these three commands in a fresh virtualenv via [`scripts/docs_test_readme.py`](scripts/docs_test_readme.py).
 
 <!-- docs-test: cpu -->
 ```bash
@@ -74,7 +74,7 @@ colcon test --base-paths src --event-handlers console_direct+ --return-code-on-t
 colcon test-result --verbose
 ```
 
-Then start the Gazebo sim with `ros2 launch omnibot_bringup sim.launch.py world:=flat`. See [docs/reference.md](docs/reference.md) for worlds, bridged topics and browser teleop.
+Then start the Gazebo sim with `ros2 launch omnibot_bringup sim.launch.py world:=flat`. That launch also drives the SO-101 arm, including the gripper, through `arm_sim_driver` using the joint limits and safety rules in [`omnibot_arm/config/arm_params.yaml`](omnibot-ros2/omnibot_arm/config/arm_params.yaml). See [docs/reference.md](docs/reference.md) for worlds, bridged topics and browser teleop.
 
 On the physical robot (docs-test skips this):
 
@@ -144,13 +144,49 @@ Changes to [`nav2_params.yaml`](omnibot-ros2/omnibot_navigation/config/nav2_para
 
 Not covered: `drive:=mecanum` (wheel-physics) with Nav2 was tried once and the `map` frame never appeared before Nav2's startup timeout, so `sim_navigation.launch.py` uses the planar holonomic drive only. The 3-D RTAB-Map stack, real-robot SLAM/Nav2, and bags are untouched.
 
-GPU policy stacks (OpenVLA / SmolVLA, Isaac Lab RL) need a desktop NVIDIA GPU, not the Raspberry Pi:
+GPU policy stacks (OmniVLA engine / OpenVLA / SmolVLA, Isaac Lab RL) need a desktop NVIDIA GPU, not the Raspberry Pi. The OmniVLA engine Python package is `vla_engine` ([README](omnibot-ai-engines/vla_engine/README.md)); CI runs its FastAPI tests with CPU torch.
 
 <!-- docs-test: skip gpu -->
 ```bash
-pip install -r omnibot-ai-engines/vla_engine/requirements.txt
+pip install -e "omnibot-ai-engines/vla_engine[serve,gpu]"
 pip install -r omnibot-ai-engines/rl_engine/requirements.txt
 ```
+
+## Replay a run (MCAP + Foxglove)
+
+OmniBot records demo and telemetry runs into [MCAP](https://mcap.dev/) files via `rosbag2` with zstd compression, providing an honest 'Twin v0' replay and scrub capability without requiring proprietary simulators.
+
+### Record a run
+
+To record a run to MCAP:
+
+<!-- docs-test: skip ros -->
+```bash
+ros2 launch omnibot_bringup record.launch.py
+```
+
+Options:
+- `bag_path:=my_run`: Output directory / bag name (defaults to timestamped `rosbag2_YYYY_MM_DD-HH_mm_ss`).
+- `use_sim_time:=true`: Timestamp using simulation `/clock`.
+- `topics:="/tf /odom /scan ..."`: Override default topics.
+
+Default recorded topics:
+- `/tf`, `/tf_static`: Transform tree
+- `/odom`: Robot odometry and twist
+- `/scan`: 2D LaserScan
+- `/camera/*`: Front, wrist, BEV, and depth camera streams
+- `/agent/trace`, `/agent/loop_trace`: Agent loop decisions, tool calls, and verifier traces
+- `/imu`, `/imu/data`: Linear acceleration and angular velocity
+- `/rosout`: ROS logs
+
+### Replay in Foxglove Studio
+
+1. Open [Foxglove Studio](https://foxglove.dev/) (desktop app or [web app](https://app.foxglove.dev)).
+2. Choose **Open local file** and select the `.mcap` file.
+3. Import the checked-in layout: [`foxglove/omnibot_layout.json`](foxglove/omnibot_layout.json) (**Layout** &rarr; **Import from file...**).
+4. Scrub the timeline to inspect the 3D scene (`/tf`, `/odom`, `/scan`), camera feeds, odometry/IMU plots, mission status, and agent execution trace.
+
+Sample 30 s run MCAP: attached to GitHub releases (under 50 MB, replays directly in Foxglove Studio).
 
 ## Hardware (bill of materials)
 
@@ -200,7 +236,7 @@ flowchart LR
   AD --> LR
 ```
 
-Details: control-mode gating in [docs/reference.md](docs/reference.md#bring-up-control-mode), arm and policy safety in [docs/safety.md](docs/safety.md).
+Details: control-mode gating in [docs/reference.md](docs/reference.md#bring-up-control-mode), arm and policy safety in [docs/safety.md](docs/safety.md). October pick-and-place fill-in: [docs/october-task.md](docs/october-task.md).
 
 ## Observability (1 robot)
 
@@ -214,6 +250,10 @@ Prometheus, alert rules, Grafana dashboards, and Loki compose stack live in [`in
 - [ ] SO-100 arm support ([#26](https://github.com/ohho-robotics/OmniBot/issues/26))
 - [ ] WebRTC video for the Quest client (MJPEG today)
 - [ ] First tagged release, v0.1.0
+
+## VR profile tag (not yet tagged)
+
+The Quest client lives in [OhhO-VR](https://github.com/ohho-robotics/OhhO-VR), not in a second Unity tree on this commit. The Gazebo VR launch (`sim_vr.launch.py`), the real-robot VR launch (`robot_vr.launch.py`), and the GPU sim compose file are on other branches. They are not in `origin/main` (`d296c9be6cc898e11e8f671c2457292b30cec905`). The intended git tag is `vr-profile-v1.0.0`. It is not yet tagged. The intended sim image name `ghcr.io/ohho-robotics/omnibot-sim:vr-1.0.0` is a placeholder and is not published. Notes and the human commands: [CHANGELOG.md](CHANGELOG.md), [docs/releases/vr-profile-tag-commands.md](docs/releases/vr-profile-tag-commands.md).
 
 ## Contributing & community
 

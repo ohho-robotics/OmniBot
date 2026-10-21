@@ -958,6 +958,16 @@
         <origin xyz="0.030 0 0.025" rpy="0 ${PI/6} 0"/>
     </joint>
 
+    <!-- Gripper contact friction so the jaw can hold the apartment grasp cube. -->
+    <gazebo reference="arm_gripper_link">
+        <mu1>2.0</mu1>
+        <mu2>2.0</mu2>
+    </gazebo>
+    <gazebo reference="arm_moving_jaw_link">
+        <mu1>2.0</mu1>
+        <mu2>2.0</mu2>
+    </gazebo>
+
     <!-- ================================================================
          Gazebo IMU Sensor
          ================================================================ -->
@@ -982,6 +992,23 @@
             </imu>
         </sensor>
     </gazebo>
+
+    <!-- Per-joint position hold for the SO-101. cmd_max is the sim
+         tracking speed (rad/s), below the URDF velocity limit of 10.
+         initial_position 0 holds the arm at the URDF zero before ROS
+         sends a target. use_velocity_commands tracks that target without
+         relying on a gravity-fighting force PID. -->
+    <xacro:macro name="arm_joint_position_controller" params="joint">
+        <plugin filename="gz-sim-joint-position-controller-system"
+                name="gz::sim::systems::JointPositionController">
+            <joint_name>${joint}</joint_name>
+            <topic>/arm/sim/${joint}/cmd_pos</topic>
+            <initial_position>0</initial_position>
+            <use_velocity_commands>true</use_velocity_commands>
+            <cmd_max>1.5</cmd_max>
+            <cmd_min>-1.5</cmd_min>
+        </plugin>
+    </xacro:macro>
 
     <!-- ================================================================
          Gazebo Harmonic Mecanum Drive Plugin
@@ -1029,13 +1056,38 @@
 
         <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
             <!-- Absolute topic so ros_gz_bridge can bridge it directly to /joint_states in ROS.
-                 Only wheel joints here — arm joints come from arm_driver_node (sim passthrough)
-                 remapped onto /joint_states so robot_state_publisher gets both. -->
+                 Wheel joints only. Arm joints are a second publisher below so the
+                 two messages are not merged on one gz topic. -->
             <topic>/joint_states</topic>
             <joint_name>front_left_wheel_joint</joint_name>
             <joint_name>front_right_wheel_joint</joint_name>
             <joint_name>rear_left_wheel_joint</joint_name>
             <joint_name>rear_right_wheel_joint</joint_name>
+        </plugin>
+
+        <!-- SO-101 in Gazebo Harmonic. One JointPositionController per joint
+             (gz-sim-8), speed-capped, plus a JointStatePublisher for the arm.
+             gz_ros2_control is not used: sim.launch.py already runs on the
+             gz-sim systems shipped with ros_gz_sim. Software limits, the
+             0.15 rad step, the 0.2 s hold, and the e-stop latch are applied
+             by arm_sim_driver from arm_params.yaml via arm_safety.py.
+             URDF lower/upper values stay the SO-101 calib stops. -->
+        <xacro:arm_joint_position_controller joint="arm_shoulder_pan"/>
+        <xacro:arm_joint_position_controller joint="arm_shoulder_lift"/>
+        <xacro:arm_joint_position_controller joint="arm_elbow_flex"/>
+        <xacro:arm_joint_position_controller joint="arm_wrist_flex"/>
+        <xacro:arm_joint_position_controller joint="arm_wrist_roll"/>
+        <xacro:arm_joint_position_controller joint="arm_gripper"/>
+
+        <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
+            <topic>/arm/sim/joint_states</topic>
+            <update_rate>50</update_rate>
+            <joint_name>arm_shoulder_pan</joint_name>
+            <joint_name>arm_shoulder_lift</joint_name>
+            <joint_name>arm_elbow_flex</joint_name>
+            <joint_name>arm_wrist_flex</joint_name>
+            <joint_name>arm_wrist_roll</joint_name>
+            <joint_name>arm_gripper</joint_name>
         </plugin>
 
         <!-- NOTE: gz-sim-sensors-system and gz-sim-imu-system are world-level
