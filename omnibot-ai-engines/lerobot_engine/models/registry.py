@@ -43,7 +43,7 @@ def make_policy(
     model_type: str,
     checkpoint: Optional[str] = None,
     device: str = "cuda",
-    **kwargs,
+    **kwargs: object,
 ) -> PolicyAdapter:
     """Instantiate and load a policy adapter by registry name.
 
@@ -51,7 +51,9 @@ def make_policy(
         model_type: Registry name, e.g. "smolvla", "act", "diffusion", "openvla".
         checkpoint:  HuggingFace hub ID, local path, or None to initialize from config.
         device:      "cuda" or "cpu".
-        **kwargs:    Additional arguments passed to adapter.load().
+        **kwargs:    ``serve_url``, ``timeout_sec``, and ``api_key`` are set on the
+                     adapter before load. Remaining arguments are passed to
+                     adapter.load().
 
     Returns:
         A fully loaded PolicyAdapter ready for select_action().
@@ -65,5 +67,9 @@ def make_policy(
             f"Unknown model type '{model_type}'. Registered: {list_models()}"
         )
     adapter = _REGISTRY[model_type]()
-    adapter.load(checkpoint, device, **kwargs)
+    load_kwargs = dict(kwargs)
+    for key in ("serve_url", "timeout_sec", "api_key"):
+        if key in load_kwargs:
+            setattr(adapter, key, load_kwargs.pop(key))
+    adapter.load(checkpoint, device, **load_kwargs)
     return adapter
