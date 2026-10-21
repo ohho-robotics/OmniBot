@@ -5,6 +5,7 @@
 import copy
 import math
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -118,6 +119,24 @@ def test_joint_home_outside_limits_is_refused():
     bad["arms"][0]["joints"][0]["home"] = 4.0
     with pytest.raises(ValueError, match="home"):
         assemble_descriptor(bad)
+
+
+def test_descriptor_node_is_executable():
+    # colcon --symlink-install keeps this mode. launch's which() skips a
+    # non-executable file and reports it missing from libexec.
+    root = Path(__file__).resolve().parents[3]
+    listed = subprocess.check_output(
+        [
+            "git",
+            "ls-files",
+            "-s",
+            "--",
+            "omnibot-ros2/omnibot_bringup/scripts/descriptor_node.py",
+        ],
+        cwd=root,
+        text=True,
+    )
+    assert listed.startswith("100755")
 
 
 def test_publisher_is_latched_on_the_contract_topic():
