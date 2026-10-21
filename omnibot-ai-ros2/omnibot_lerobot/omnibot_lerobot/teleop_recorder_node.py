@@ -13,12 +13,21 @@ State machine:
   SAVING    → writing episode to disk
 
 Topics subscribed:
-  /arm/leader_states           (sensor_msgs/JointState) - leader arm (arm actions)
+  /arm/leader_states           (sensor_msgs/JointState) - leader arm (arm actions, leader mode)
   /arm/joint_states            (sensor_msgs/JointState) - follower arm (arm observations)
-  /joy                         (sensor_msgs/Joy)         - Xbox controller
+  /joy                         (sensor_msgs/Joy)         - Xbox controller (leader base action)
   /camera/wrist/image_raw      (sensor_msgs/Image)  → observation.images.wrist
   /camera/base/bev/image_raw   (sensor_msgs/Image)  → observation.images.bev (BEV mosaic from 4 base cameras)
-  /odom                        (nav_msgs/Odometry)       - base velocity
+  /odom                        (nav_msgs/Odometry)       - base velocity (state)
+
+action_source:=vr (default is leader; leader behaviour is unchanged):
+  Arm action is the last JointState on /arm/joint_commands/teleop (OHH-197).
+  If that topic is silent, /arm/joint_commands/out is used only while
+  /control_mode is teleop. Base action is /cmd_vel/teleop, with /cmd_vel/out
+  as the same teleop-only fallback. State stays follower joints + /odom.
+  Episode start/stop/discard are the /ohho/record services. /joy is not
+  required. This node never publishes a joint command or a base twist.
+  Leader episodes still go through the ohho-os Recorder when it imports.
 
 Unified 9D action:  [arm(6), base_vx, base_vy, base_vz]
 Unified 9D state:   [arm(6), base_vx, base_vy, base_vz]
@@ -84,20 +93,48 @@ OHHO_RECORDING = OHHO_AVAILABLE and WRITER_AVAILABLE
 
 try:
     from omnibot_lerobot.record_session import RecordPhase, RecordSession, commit_stop
+    from omnibot_lerobot.lerobot_v2 import append_episode
+    from omnibot_lerobot.vr_action import (
+        ACTION_SOURCE_VR,
+        DEFAULT_ARM_COMMAND_TOPIC,
+        DEFAULT_ARM_MUX_TOPIC,
+        DEFAULT_BASE_COMMAND_TOPIC,
+        DEFAULT_BASE_MUX_TOPIC,
+        DEFAULT_CONTROL_MODE_TOPIC,
+        JOINT_NAMES,
+        assemble_vr_sample,
+        episode_metadata,
+        normalize_action_source,
+        normalize_control_mode,
+        normalize_prefer,
+        normalize_robot_kind,
+        positions_for_joints,
+        twist_vector,
+    )
 except ImportError:
     from record_session import RecordPhase, RecordSession, commit_stop
+    from lerobot_v2 import append_episode
+    from vr_action import (
+        ACTION_SOURCE_VR,
+        DEFAULT_ARM_COMMAND_TOPIC,
+        DEFAULT_ARM_MUX_TOPIC,
+        DEFAULT_BASE_COMMAND_TOPIC,
+        DEFAULT_BASE_MUX_TOPIC,
+        DEFAULT_CONTROL_MODE_TOPIC,
+        JOINT_NAMES,
+        assemble_vr_sample,
+        episode_metadata,
+        normalize_action_source,
+        normalize_control_mode,
+        normalize_prefer,
+        normalize_robot_kind,
+        positions_for_joints,
+        twist_vector,
+    )
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-JOINT_NAMES = [
-    "arm_shoulder_pan",
-    "arm_shoulder_lift",
-    "arm_elbow_flex",
-    "arm_wrist_flex",
-    "arm_wrist_roll",
-    "arm_gripper",
-]
 MAX_LINEAR = 0.2  # m/s safe recording speed
 MAX_ANGULAR = 1.0  # rad/s
 STATE_TOPIC = "/ohho/record/state"
@@ -116,8 +153,8 @@ class RecordState(Enum):
 class TeleopRecorderNode(Node):
     """Records teleoperation episodes in LeRobot HF dataset format."""
 
-    def __init__(self):
-        super().__init__("teleop_recorder_node")
+    def __init__(self, **node_kwargs):
+        super().__init__("teleop_recorder_node", **node_kwargs)
 
         # ------------------------------------------------------------------
         # Parameters
@@ -131,6 +168,17 @@ class TeleopRecorderNode(Node):
         self.declare_parameter("task_name", "mobile manipulation task")
         # -1 means "use the recorder's next index". >= 0 pins that index on every start.
         self.declare_parameter("episode_index", -1)
+        # leader keeps the joystick + leader-arm path. vr records teleop topics.
+        self.declare_parameter("action_source", "leader")
+        self.declare_parameter("operator", "")
+        self.declare_parameter("robot_kind", "sim")
+        self.declare_parameter("sim_world", "")
+        self.declare_parameter("vr_action_prefer", "teleop")
+        self.declare_parameter("vr_arm_command_topic", DEFAULT_ARM_COMMAND_TOPIC)
+        self.declare_parameter("vr_arm_mux_topic", DEFAULT_ARM_MUX_TOPIC)
+        self.declare_parameter("vr_base_command_topic", DEFAULT_BASE_COMMAND_TOPIC)
+        self.declare_parameter("vr_base_mux_topic", DEFAULT_BASE_MUX_TOPIC)
+        self.declare_parameter("control_mode_topic", DEFAULT_CONTROL_MODE_TOPIC)
 
         self.output_dir = os.path.expanduser(self.get_parameter("output_dir").value)
         self.repo_id = self.get_parameter("repo_id").value
@@ -138,6 +186,44 @@ class TeleopRecorderNode(Node):
         self.episode_timeout_s = self.get_parameter("episode_timeout_s").value
         self.joy_record_button = self.get_parameter("joy_record_button").value
         self.joy_discard_button = self.get_parameter("joy_discard_button").value
+        self.action_source = self._read_action_source()
+        self.robot_kind, robot_kind_ok = normalize_robot_kind(
+            self.get_parameter("robot_kind").value
+        )
+        self.vr_action_prefer, prefer_ok = normalize_prefer(
+            self.get_parameter("vr_action_prefer").value
+        )
+        sim_world = self.get_parameter("sim_world").value
+        self.sim_world = sim_world.strip() if isinstance(sim_world, str) else ""
+        if not robot_kind_ok:
+            self.get_logger().warn(
+                f'Unknown robot_kind "{self.get_parameter("robot_kind").value}" — using "sim".'
+            )
+        if not prefer_ok:
+            self.get_logger().warn(
+                "Unknown vr_action_prefer "
+                f'"{self.get_parameter("vr_action_prefer").value}" — using "teleop".'
+            )
+        operator = self.get_parameter("operator").value
+        if isinstance(operator, str) and operator.strip():
+            self.operator = operator.strip()
+        elif self.action_source == ACTION_SOURCE_VR:
+            self.operator = "vr"
+        else:
+            self.operator = ""
+        self.vr_arm_command_topic = self._topic_param(
+            "vr_arm_command_topic", DEFAULT_ARM_COMMAND_TOPIC
+        )
+        self.vr_arm_mux_topic = self._topic_param("vr_arm_mux_topic", DEFAULT_ARM_MUX_TOPIC)
+        self.vr_base_command_topic = self._topic_param(
+            "vr_base_command_topic", DEFAULT_BASE_COMMAND_TOPIC
+        )
+        self.vr_base_mux_topic = self._topic_param(
+            "vr_base_mux_topic", DEFAULT_BASE_MUX_TOPIC
+        )
+        self.control_mode_topic = self._topic_param(
+            "control_mode_topic", DEFAULT_CONTROL_MODE_TOPIC
+        )
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -170,6 +256,13 @@ class TeleopRecorderNode(Node):
             if OHHO_RECORDING and OhhoTeleopRecorder is not None
             else None
         )
+        # Last VR samples. None means that topic has not published yet.
+        # Mux samples are ignored unless /control_mode is teleop.
+        self._arm_teleop = None
+        self._arm_mux = None
+        self._base_teleop = None
+        self._base_mux = None
+        self._control_mode = "teleop"
 
         # ------------------------------------------------------------------
         # cv_bridge
@@ -197,6 +290,8 @@ class TeleopRecorderNode(Node):
             Image, "/camera/base/bev/image_raw", self.bev_image_cb, 10
         )
         self.create_subscription(Odometry, "/odom", self.odom_cb, 10)
+        if self.action_source == ACTION_SOURCE_VR:
+            self._subscribe_vr_topics()
 
         # ------------------------------------------------------------------
         # Record timer
@@ -204,7 +299,9 @@ class TeleopRecorderNode(Node):
         timer_period = 1.0 / self.record_hz
         self.create_timer(timer_period, self.record_timer_cb)
 
-        if self._ohho_rec is not None:
+        if self.action_source == ACTION_SOURCE_VR:
+            writer = "lerobot v2"
+        elif self._ohho_rec is not None:
             writer = "ohho-os+data_engine"
         elif LEROBOT_AVAILABLE:
             writer = "lerobot"
@@ -212,12 +309,22 @@ class TeleopRecorderNode(Node):
             writer = "numpy fallback"
         self.get_logger().info(
             f"TeleopRecorderNode started | hz={self.record_hz} | "
-            f"output={self.output_dir} | writer={writer}"
+            f"source={self.action_source} | output={self.output_dir} | writer={writer}"
         )
         self.get_logger().info(
             f"Press button {self.joy_record_button} (RB) to start/stop recording. "
             f"Button {self.joy_discard_button} (LB) discards the current episode."
         )
+        if self.action_source == ACTION_SOURCE_VR:
+            self.get_logger().info(
+                "VR action source. Episode control is /ohho/record/start, "
+                "/ohho/record/stop, and /ohho/record/discard (joystick not required). "
+                f"Arm {self.vr_arm_command_topic} (mux fallback {self.vr_arm_mux_topic} "
+                f"only in teleop), base {self.vr_base_command_topic} "
+                f"(mux fallback {self.vr_base_mux_topic}). "
+                f"prefer={self.vr_action_prefer} operator={self.operator} "
+                f"robot_kind={self.robot_kind} sim_world={self.sim_world or '(none)'}."
+            )
 
         state_qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -283,6 +390,65 @@ class TeleopRecorderNode(Node):
             ],
             dtype=np.float32,
         )
+
+    def _subscribe_vr_topics(self) -> None:
+        """Subscribe to teleop commands. This node does not publish them."""
+        from geometry_msgs.msg import Twist
+
+        self.create_subscription(
+            JointState, self.vr_arm_command_topic, self._vr_arm_cb, 10
+        )
+        self.create_subscription(JointState, self.vr_arm_mux_topic, self._vr_arm_mux_cb, 10)
+        self.create_subscription(Twist, self.vr_base_command_topic, self._vr_base_cb, 10)
+        self.create_subscription(Twist, self.vr_base_mux_topic, self._vr_base_mux_cb, 10)
+        self.create_subscription(String, self.control_mode_topic, self._control_mode_cb, 10)
+
+    def _vr_arm_cb(self, msg: JointState) -> None:
+        positions = positions_for_joints(msg.name, msg.position)
+        if positions is not None:
+            self._arm_teleop = positions
+
+    def _vr_arm_mux_cb(self, msg: JointState) -> None:
+        positions = positions_for_joints(msg.name, msg.position)
+        if positions is not None:
+            self._arm_mux = positions
+
+    def _vr_base_cb(self, msg) -> None:
+        sample = twist_vector(msg.linear.x, msg.linear.y, msg.angular.z)
+        if sample is not None:
+            self._base_teleop = sample
+
+    def _vr_base_mux_cb(self, msg) -> None:
+        sample = twist_vector(msg.linear.x, msg.linear.y, msg.angular.z)
+        if sample is not None:
+            self._base_mux = sample
+
+    def _control_mode_cb(self, msg: String) -> None:
+        mode = normalize_control_mode(msg.data)
+        if mode is None:
+            shown = msg.data if isinstance(msg.data, str) else msg.data
+            self.get_logger().warn(
+                f'Unknown control mode "{shown}" ignored. Keeping "{self._control_mode}".'
+            )
+            return
+        self._control_mode = mode
+
+    def _read_action_source(self) -> str:
+        try:
+            return normalize_action_source(self.get_parameter("action_source").value)
+        except ValueError:
+            shown = self.get_parameter("action_source").value
+            self.get_logger().warn(
+                f'Unknown action_source "{shown}" — using "leader".'
+            )
+            return "leader"
+
+    def _topic_param(self, name: str, default: str) -> str:
+        value = self.get_parameter(name).value
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        self.get_logger().warn(f'Empty {name} — using "{default}".')
+        return default
 
     def joy_cb(self, msg: Joy):
         self.prev_joy_buttons = list(self.joy_buttons)
@@ -369,9 +535,8 @@ class TeleopRecorderNode(Node):
 
             self._record_frame()
 
-    def _record_frame(self):
-        """Capture and append one frame to the episode buffer."""
-        # Base action from joy axes (standard Xbox mapping)
+    def _leader_action_state(self):
+        """Leader arm positions plus Xbox base axes. Unchanged leader path."""
         base_vx = (
             float(self.joy_axes[1]) * MAX_LINEAR if len(self.joy_axes) > 1 else 0.0
         )
@@ -381,16 +546,37 @@ class TeleopRecorderNode(Node):
         base_vz = (
             float(self.joy_axes[3]) * MAX_ANGULAR if len(self.joy_axes) > 3 else 0.0
         )
-
-        # 9D action: [arm(6), base_vx, base_vy, base_vz]
         arm_action = self.leader_positions.copy()
         base_action = np.array([base_vx, base_vy, base_vz], dtype=np.float32)
         full_action = np.concatenate([arm_action, base_action])
-
-        # 9D state: [follower_arm(6), base_vx, base_vy, base_vz]
         full_state = np.concatenate(
             [self.follower_positions.copy(), self.base_vel.copy()]
         )
+        return full_action, full_state
+
+    def _vr_action_state(self):
+        """Last teleop command as the action. Follower joints and odom as the state."""
+        sample = assemble_vr_sample(
+            arm_teleop=self._arm_teleop,
+            arm_mux=self._arm_mux,
+            base_teleop=self._base_teleop,
+            base_mux=self._base_mux,
+            control_mode=self._control_mode,
+            follower=self.follower_positions,
+            odom_twist=self.base_vel,
+            prefer=self.vr_action_prefer,
+        )
+        return sample
+
+    def _record_frame(self):
+        """Capture and append one frame to the episode buffer."""
+        vr_sample = None
+        if self.action_source == ACTION_SOURCE_VR:
+            vr_sample = self._vr_action_state()
+            full_action = vr_sample.action
+            full_state = vr_sample.state
+        else:
+            full_action, full_state = self._leader_action_state()
 
         # Images (copy to avoid mutation)
         wrist_img = (
@@ -404,21 +590,26 @@ class TeleopRecorderNode(Node):
             else np.zeros((240, 320, 3), dtype=np.uint8)
         )
 
-        wall_t = time.time()
+        captured_at = time.time()
         frame = {
             "state": full_state.astype(np.float32),
             "action": full_action.astype(np.float32),
             "wrist_image": wrist_img,
             "bev_image": bev_img,  # BEV mosaic from 4 base cameras
-            "timestamp": wall_t,
+            "timestamp": captured_at,
+            "wrist_timestamp": captured_at,
+            "bev_timestamp": captured_at,
         }
-        if self.session.append_frame(frame) and self._ohho_rec is not None:
+        if vr_sample is not None:
+            frame["arm_source"] = vr_sample.arm_source
+            frame["base_source"] = vr_sample.base_source
+        if self.session.append_frame(frame) and self._leader_uses_ohho():
             self._ohho_rec.capture_frame(
                 full_state,
                 full_action,
                 wrist_img,
                 bev_img,
-                wall_timestamp=wall_t,
+                wall_timestamp=captured_at,
                 wrist_timestamp=self.wrist_msg_time,
                 bev_timestamp=self.bev_msg_time,
             )
@@ -478,8 +669,12 @@ class TeleopRecorderNode(Node):
         self._publish_state()
         return result
 
+    def _leader_uses_ohho(self) -> bool:
+        """Leader episodes use ohho-os. VR episodes use the LeRobot v2 writer."""
+        return self._ohho_rec is not None and self.action_source != ACTION_SOURCE_VR
+
     def _start_ohho_episode(self) -> None:
-        if self._ohho_rec is None:
+        if not self._leader_uses_ohho():
             return
         # discard_episode is a no-op when nothing is open. It clears a leftover
         # episode so start_episode cannot raise after an empty stop.
@@ -487,7 +682,7 @@ class TeleopRecorderNode(Node):
         self._ohho_rec.start_episode(self.task_description)
 
     def _discard_ohho_episode(self) -> None:
-        if self._ohho_rec is None:
+        if not self._leader_uses_ohho():
             return
         self._ohho_rec.discard_episode()
 
@@ -561,7 +756,9 @@ class TeleopRecorderNode(Node):
         if not self.episode_buffer:
             raise RuntimeError("no frames to save")
 
-        if self._ohho_rec is not None:
+        if self.action_source == ACTION_SOURCE_VR:
+            self._save_vr_dataset()
+        elif self._ohho_rec is not None:
             self._ohho_rec.save_episode(
                 self.output_dir,
                 self.task_description,
@@ -577,6 +774,28 @@ class TeleopRecorderNode(Node):
             f"Episode {self.episode_index} saved "
             f"({self.frame_count} frames @ {self.record_hz:.0f} Hz, "
             f"{self.frame_count / self.record_hz:.1f}s)."
+        )
+
+    def _save_vr_dataset(self):
+        """Write a LeRobot v2 episode. Does not publish motion commands."""
+        metadata = episode_metadata(
+            task=self.task_description,
+            operator=self.operator or "vr",
+            robot_kind=self.robot_kind,
+            sim_world=self.sim_world,
+        )
+        append_episode(
+            self.output_dir,
+            self.episode_buffer,
+            metadata,
+            fps=max(int(round(float(self.record_hz))), 1),
+            episode_index=int(self.episode_index),
+            repo_id=self.repo_id,
+        )
+        self.get_logger().info(
+            "VR episode metadata "
+            f"operator={metadata['operator']} robot_kind={metadata['robot_kind']} "
+            f"sim_world={metadata['sim_world'] or '(none)'} task={metadata['task']}"
         )
 
     def _save_lerobot_format(self):

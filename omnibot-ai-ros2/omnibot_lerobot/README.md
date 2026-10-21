@@ -90,6 +90,47 @@ Subscribe for the HUD (state and frame count):
 
 The bridge then publishes `msg.data` as a JSON string. Parse that string. Do not treat the rosbridge envelope as the recording state.
 
+## VR action source (`action_source:=vr`)
+
+`action_source` defaults to `leader`. That path is unchanged: the leader arm is the arm action, Xbox axes are the base action, and RB/LB still start, save, and discard.
+
+`action_source:=vr` records the VR teleop command instead.
+
+| Vector | Source |
+|---|---|
+| Arm action (6) | Last `JointState` on `vr_arm_command_topic` (default `/arm/joint_commands/teleop`, the OHH-197 teleop input). |
+| Arm fallback | `vr_arm_mux_topic` (default `/arm/joint_commands/out`) only while `/control_mode` is `teleop`. A policy or navigation command on the mux is not stored. |
+| Base action (3) | Last twist on `vr_base_command_topic` (default `/cmd_vel/teleop`). `/cmd_vel/out` is the same teleop-only fallback. |
+| State (9) | Follower `/arm/joint_states` plus `/odom` (`vx`, `vy`, `wz`). |
+
+`vr_action_prefer:=teleop` (default) uses the dedicated topic whenever a sample has arrived. `vr_action_prefer:=mux` uses the mux output when control mode is teleop, which is the command the mux is forwarding. Point `vr_arm_command_topic` at the post-safety stream if teleop safety republishes on a different name. The recorder only subscribes. It does not publish joint commands or base twists.
+
+Episode control in vr mode is the `/ohho/record` services above. A joystick is not required. If a joystick is connected, RB/LB still call the same start, save, and discard path.
+
+Each saved VR episode is a LeRobot v2.0 dataset (parquet, mp4, and a `.npy` camera array for the quality filter). `meta/episodes.jsonl` stores:
+
+- `operator` — `vr` unless `operator` is set
+- `robot_kind` — `sim` or `real`
+- `sim_world` — simulator world name, or empty
+- `task` — the task string
+
+```bash
+ros2 launch omnibot_lerobot teleop_record.launch.py \
+  action_source:=vr robot_kind:=sim sim_world:=warehouse \
+  task_name:="pick up the cup"
+```
+
+Validate the dataset and run the OHH-99 filter (from `omnibot-ai-engines`, with `pyarrow` installed):
+
+```bash
+PYTHONPATH=omnibot-ai-engines python -m data_engine.scripts.validate_dataset \
+  --dataset ~/datasets/mobile_manipulation --verbose
+PYTHONPATH=omnibot-ai-engines python -m data_engine.scripts.filter_episodes \
+  --dataset ~/datasets/mobile_manipulation
+```
+
+A headset episode was not recorded here. `test/test_vr_action.py` builds a 30 s episode from synthetic teleop samples and runs both commands. `test/fake_vr_teleop_smoke.py` publishes those topics under ROS 2. Run it only in the `navdev` image (`omnibot-nav-dev`) with `ROS_LOCALHOST_ONLY=1` and a `ROS_DOMAIN_ID` other than 30. That image's NumPy is 1.26, so install `pyarrow==18.1.0` there (do not upgrade NumPy). The script refuses to publish if those environment variables are missing.
+
 ## VR follow-up (OhhO-VR)
 
 The robot is the source of truth. The headset should not record locally and should not upload a JSONL file.

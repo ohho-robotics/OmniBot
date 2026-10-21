@@ -30,7 +30,7 @@ jobs:
         run: ruff check .
       - name: CPU suites
         run: |
-          pytest mecanum-kinematics/tests yahboom-python-driver/tests ros2-bev-stitcher/tests ohho-webrtc/tests omnibot-ros2/omnibot_arm/test omnibot-ai-ros2/omnibot_lerobot/test omnibot-ros2/omnibot_bringup/test/test_unbuilt_launch.py omnibot-ros2/omnibot_bringup/test/test_teleop_default.py omnibot-ros2/omnibot_bringup/test/test_docker_sim.py omnibot-ros2/omnibot_bringup/test/test_frame_launch_docs.py omnibot-ros2/omnibot_navigation/test omnibot-ros2/omnibot_description/test infra/observability/tests scripts/test_architecture_launch_table.py -q
+          pytest mecanum-kinematics/tests yahboom-python-driver/tests ros2-bev-stitcher/tests ohho-webrtc/tests omnibot-ros2/omnibot_arm/test omnibot-ai-ros2/omnibot_lerobot/test omnibot-ros2/omnibot_bringup/test/test_unbuilt_launch.py omnibot-ros2/omnibot_bringup/test/test_teleop_default.py omnibot-ros2/omnibot_bringup/test/test_sim_cameras.py omnibot-ros2/omnibot_bringup/test/test_docker_sim.py omnibot-ros2/omnibot_bringup/test/test_frame_launch_docs.py omnibot-ros2/omnibot_navigation/test omnibot-ros2/omnibot_description/test infra/observability/tests scripts/test_architecture_launch_table.py -q
           python -m unittest discover -s omnibot-ai-engines/learning_engine/tests -t omnibot-ai-engines
           python -m unittest discover -s omnibot-ai-engines/agent_engine/tests -t omnibot-ai-engines
           PYTHONPATH=omnibot-ai-engines pytest omnibot-ai-engines/data_engine/tests omnibot-ai-engines/lerobot_engine/tests -q
@@ -95,10 +95,15 @@ jobs:
             --dependency-types=buildtool_export \
             --dependency-types=exec \
             --dependency-types=test
+          # Jazzy ships NumPy 1.26. Current pyarrow needs NumPy 2; 18.1.0 is the pin
+          # the lerobot README uses for that NumPy.
+          # data_engine is not installed here (its setup.py pulls torch). The
+          # lerobot test shells out to validate_dataset and filter_episodes,
+          # which import click. The CPU job installs that extra the same way.
           python3 -m pip install --break-system-packages \
             -e omnibot-ai-engines/learning_engine \
             -e omnibot-ai-engines/agent_engine \
-            numpy
+            numpy pyarrow==18.1.0 click
           colcon build --symlink-install --base-paths src
           source install/setup.bash
           colcon test --base-paths src --event-handlers console_direct+ --return-code-on-test-failure

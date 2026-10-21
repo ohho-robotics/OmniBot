@@ -15,13 +15,20 @@ sys.path.insert(0, str(REPO / "omnibot-ai-ros2" / "omnibot_lerobot"))
 if str(ENGINES) not in sys.path:
     sys.path.insert(0, str(ENGINES))
 
-ohho = pytest.importorskip("ohho")
+try:
+    import ohho  # noqa: F401
+except ImportError:
+    ohho = None
 
-from omnibot_lerobot.ohho_teleop_recorder import OhhoTeleopRecorder
-from data_engine.scripts.validate_dataset import validate
+# A module-level importorskip raises during collection. On pytest 7.4 that
+# aborts the rest of this package, so the VR and session tests never run.
+pytestmark = pytest.mark.skipif(ohho is None, reason="ohho is not installed")
 
 
 def test_ohho_recorder_writes_valid_dataset(tmp_path: Path):
+    from omnibot_lerobot.ohho_teleop_recorder import OhhoTeleopRecorder
+    from data_engine.scripts.validate_dataset import validate
+
     rec = OhhoTeleopRecorder("local/unit_test", fps=10.0)
     rec.start_episode("test task")
     for i in range(3):

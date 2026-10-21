@@ -25,6 +25,10 @@ if(BUILD_TESTING)
     test/test_teleop_default.py
     TIMEOUT 60
   )
+  ament_add_pytest_test(test_sim_cameras
+    test/test_sim_cameras.py
+    TIMEOUT 60
+  )
 
   ament_add_pytest_test(test_record_launch
     test/test_record_launch.py
