@@ -47,6 +47,16 @@ if(BUILD_TESTING)
   endif()
 endif()
 
+install(PROGRAMS
+  scripts/descriptor_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(FILES
+  scripts/descriptor_assemble.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 # Install launch files (including master/ subfolder)
 install(DIRECTORY
   launch
