@@ -26,10 +26,15 @@ scenarios:
 
   - id: origin_to_door
     start: {x: 0.0, y: 0.0, yaw_deg: 0.0}
+    # Same pose as the door waypoint in waypoints.yaml (the nav-sim "door" run).
     goal: {x: -0.3, y: -1.45, yaw_deg: -90.0}
     obstacle:
       name: south_hall_box
-      pose: {x: -0.05, y: -0.75, yaw_deg: 0.0}
+      # y=-0.75 left the box surface 0.55 m from the door goal, on the
+      # costmap inflation radius, and the door leaf is 0.54 m from that goal.
+      # DWB made no progress. Keep the box on the origin-to-door segment and
+      # the goal outside that inflation.
+      pose: {x: -0.05, y: -0.50, yaw_deg: 0.0}
       size: {x: 0.35, y: 0.30, z: 0.45}
 
   - id: north_to_kitchen
