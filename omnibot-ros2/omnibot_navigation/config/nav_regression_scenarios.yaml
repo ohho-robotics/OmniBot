@@ -58,12 +58,21 @@ scenarios:
       size: {x: 0.32, y: 0.38, z: 0.45}
 
   - id: east_mid_to_desk
-    start: {x: 2.9, y: -0.5, yaw_deg: 180.0}
+    # East side, south of the desk, already facing the desk. The old start
+    # (2.9, -0.5) was 0.525 m from the east wall (inside the 0.55 m inflation)
+    # and only 0.35 m from the goal, under the 0.50 m progress radius, so a
+    # missed first 10 s window could not be recovered.
+    start: {x: 1.80, y: -1.70, yaw_deg: 59.0}
     goal: {x: 2.55, y: -0.45, yaw_deg: 90.0}
     obstacle:
       name: desk_entry_box
-      pose: {x: 2.75, y: -0.05, yaw_deg: 0.0}
-      size: {x: 0.25, y: 0.35, z: 0.45}
+      # (2.75, -0.05) left a corner 0.24 m from the goal, inside the footprint
+      # circumradius and the inflation. The robot stopped at xy error 0.18 m
+      # with yaw already inside 0.20 rad, and Nav2 never reported success.
+      # This pose stays beside the east approach: 0.80 m from the start,
+      # 0.95 m from the goal, 0.53 m off the straight run.
+      pose: {x: 2.75, y: -1.60, yaw_deg: 0.0}
+      size: {x: 0.30, y: 0.40, z: 0.45}
 
   - id: south_to_kitchen
     start: {x: 0.0, y: -1.0, yaw_deg: 90.0}
