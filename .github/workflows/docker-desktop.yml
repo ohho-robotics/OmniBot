@@ -110,7 +110,7 @@ jobs:
           set -u
           want="/clock /cmd_vel /odom /scan /joint_states /tf"
           for i in $(seq 1 60); do
-            topics="$(ros2 topic list 2>/dev/null || true)"
+            topics="$(ros2 topic list --no-daemon 2>/dev/null || true)"
             missing=""
             for t in ${want}; do grep -qx "${t}" <<<"${topics}" || missing="${missing} ${t}"; done
             if [ -z "${missing}" ] && pgrep -f "gz sim" >/dev/null; then
