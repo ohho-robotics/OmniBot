@@ -117,8 +117,8 @@ jobs:
               echo "${topics}"
               echo "Gazebo is running; all of: ${want}"
               # Simulation time advances (the world is not paused).
-              timeout 30 ros2 topic echo --once /clock
-              timeout 30 ros2 topic echo --once /odom --field header
+              timeout 30 ros2 topic echo --once /clock || { echo "no /clock message"; exit 1; }
+              timeout 30 ros2 topic echo --once /odom --field header || { echo "no /odom message"; exit 1; }
               exit 0
             fi
             echo "waiting (${i}): missing${missing}"

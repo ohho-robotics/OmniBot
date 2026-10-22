@@ -29,9 +29,11 @@ From the repository root, any one of:
 The launchers start the `desktop` service of
 [`docker-compose.yml`](../docker-compose.yml), wait until the page answers
 and open the browser. The first start pulls
-`ghcr.io/ohho-robotics/omnibot-desktop:latest` (amd64 and arm64); if it
-cannot be pulled, Compose builds it from `Dockerfile.sim` (target
-`desktop`).
+`ghcr.io/ohho-robotics/omnibot-desktop:latest` (amd64 and arm64). If that
+tag does not exist in the registry, Compose builds it from `Dockerfile.sim`
+(target `desktop`); for other pull failures (offline, DNS, registry
+authentication) build it explicitly with `--build` / `-Build` or
+`docker compose build desktop`.
 
 A terminal window on the desktop shows the launch log of
 `ros2 launch omnibot_bringup sim_desktop.launch.py`; Gazebo and RViz open
@@ -58,7 +60,7 @@ Pass them to the launcher, or set the environment variables before
 |---|---|---|---|
 | `--port N` / `-Port N` | `OMNIBOT_PORT` | `6080` | Host port of the page (bound to 127.0.0.1) |
 | `--world W` / `-World W` | `OMNIBOT_WORLD` | `flat` | `flat`, `apartment` or an SDF path in the container |
-| `--password[=P]` / `-Password` | `OMNIBOT_VNC_PASSWORD` | empty | Require a VNC password (random if none is given); the printed URL carries it |
+| `--password[=P]` / `-Password` | `OMNIBOT_VNC_PASSWORD` | empty | Require a VNC password (random if none is given); the printed URL carries it for one-click connect (see Security) |
 | `--build` / `-Build` | | | Build the image from this checkout instead of pulling |
 | `--no-browser` / `-NoBrowser` | | | Do not open the browser |
 | | `OMNIBOT_GUI` | `true` | Open the Gazebo client window |
@@ -103,8 +105,16 @@ Logs are in `/tmp/omnibot-desktop/` (`sim.log`, `xvnc.log`,
 ## Security
 
 * The page is published on `127.0.0.1` only. Other machines on the network
-  cannot reach it. To expose it, edit the `ports:` entry of the `desktop`
-  service, and set `OMNIBOT_VNC_PASSWORD`.
+  cannot reach it. Keep it that way: the page and its WebSocket are plain
+  HTTP, and VNC password authentication does not encrypt the desktop stream
+  or keyboard input. For remote use, prefer an SSH tunnel
+  (`ssh -L 6080:127.0.0.1:6080 host`) or put a TLS-terminating reverse proxy
+  with its own authentication in front; `OMNIBOT_VNC_PASSWORD` alone is not
+  enough protection on a network.
+* The launchers put the password in the URL (`vnc.html?password=...`) so the
+  page connects with one click; it can end up in browser history and in the
+  terminal output. To avoid that, open `http://localhost:<port>/` without the
+  query and type the password when noVNC asks for it.
 * The VNC server itself listens on the container's loopback; only websockify
   reaches it.
 * rosbridge (9090) runs inside the container on its loopback and is not
