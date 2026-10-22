@@ -181,3 +181,99 @@ def test_sim_navigation_launch_has_autonavigate_args():
     assert "foxglove" in content
     assert "route" in content
     assert "waypoint_navigator.py" in content
+
+
+# ── Browser desktop (Dockerfile.sim target "desktop", compose service "desktop")
+
+
+def test_dockerfile_sim_default_target_is_headless_sim():
+    content = (REPO / "Dockerfile.sim").read_text(encoding="utf-8")
+    froms = [line.split() for line in content.splitlines() if line.startswith("FROM ")]
+    assert froms[0][1:] == ["ros:jazzy-ros-base-noble", "AS", "base"]
+    assert ["FROM", "base", "AS", "desktop"] in froms
+    # The last stage is the default build target: the unchanged sim image.
+    assert froms[-1] == ["FROM", "base", "AS", "sim"]
+
+
+def test_dockerfile_desktop_stage():
+    content = (REPO / "Dockerfile.sim").read_text(encoding="utf-8")
+    desktop = content.split("FROM base AS desktop", 1)[1].split("FROM base AS sim", 1)[0]
+    for pkg in ("tigervnc-standalone-server", "websockify", "openbox", "tini"):
+        assert pkg in desktop
+    assert "NOVNC_SHA256=" in desktop and "sha256sum -c" in desktop
+    assert "COPY docker/desktop/rootfs/ /" in desktop
+    assert "EXPOSE 6080" in desktop
+    assert "HEALTHCHECK" in desktop and "omnibot-desktop-healthcheck" in desktop
+    assert "QT_QPA_PLATFORM=xcb" in desktop
+    assert '"/usr/local/bin/omnibot-desktop"' in desktop
+
+
+def test_desktop_rootfs_scripts():
+    rootfs = REPO / "docker" / "desktop" / "rootfs"
+    entry = (rootfs / "usr/local/bin/omnibot-desktop").read_text(encoding="utf-8")
+    assert "-localhost" in entry  # VNC on the container loopback only
+    assert "OMNIBOT_VNC_PASSWORD" in entry and "VncAuth" in entry
+    assert "websockify --web /opt/novnc" in entry
+    sim = (rootfs / "usr/local/bin/omnibot-desktop-sim").read_text(encoding="utf-8")
+    assert "sim_desktop.launch.py" in sim
+    for name in ("omnibot-desktop", "omnibot-desktop-sim", "omnibot-desktop-healthcheck"):
+        raw = (rootfs / "usr/local/bin" / name).read_bytes()
+        assert raw.startswith(b"#!"), name
+        assert b"\r\n" not in raw, f"{name} must keep LF line endings"
+    assert json.loads((rootfs / "opt/novnc/defaults.json").read_text())["autoconnect"] is True
+
+
+def test_compose_desktop_service():
+    data = yaml.safe_load((REPO / "docker-compose.yml").read_text(encoding="utf-8"))
+    desktop = data["services"]["desktop"]
+    # Only started when named, so `docker compose up` is unchanged.
+    assert desktop["profiles"] == ["desktop"]
+    assert desktop["build"]["dockerfile"] == "Dockerfile.sim"
+    assert desktop["build"]["target"] == "desktop"
+    assert "omnibot-desktop" in desktop["image"]
+    assert "network_mode" not in desktop
+    assert desktop["ports"] == ["127.0.0.1:${OMNIBOT_PORT:-6080}:6080"]
+    assert desktop["shm_size"] == "2gb"
+    assert "OMNIBOT_VNC_PASSWORD=${OMNIBOT_VNC_PASSWORD:-}" in desktop["environment"]
+    assert any(v.startswith("desktop-home:/home/user") for v in desktop["volumes"])
+    assert any(v.endswith(":/home/user/shared") for v in desktop["volumes"])
+    assert "/usr/local/bin/omnibot-desktop-healthcheck" in desktop["healthcheck"]["test"]
+    assert data["volumes"]["desktop-home"]["name"] == "omnibot-desktop-home"
+    # The headless services keep their image and build target.
+    assert "target" not in data["services"]["sim"].get("build", {})
+
+
+def test_desktop_launchers_present():
+    d = REPO / "docker"
+    for name in ("omnibot-desktop.sh", "omnibot-desktop.ps1", "omnibot-desktop.cmd", "README.md"):
+        assert (d / name).is_file(), name
+    sh = (d / "omnibot-desktop.sh").read_text(encoding="utf-8")
+    ps1 = (d / "omnibot-desktop.ps1").read_text(encoding="utf-8")
+    assert "OMNIBOT_PORT" in sh and "OMNIBOT_PORT" in ps1
+    assert "--profile desktop" in sh and "--profile desktop" in ps1
+
+
+def test_sim_desktop_launch_and_rviz_config():
+    bringup = REPO / "omnibot-ros2" / "omnibot_bringup"
+    launch = (bringup / "launch" / "sim_desktop.launch.py").read_text(encoding="utf-8")
+    assert "sim.launch.py" in launch
+    assert "joint_state_publisher" in launch and "/arm/joint_states" in launch
+    assert "rviz2" in launch and "sim_desktop.rviz" in launch
+    rviz = yaml.safe_load((bringup / "config" / "sim_desktop.rviz").read_text(encoding="utf-8"))
+    assert rviz["Visualization Manager"]["Global Options"]["Fixed Frame"] == "odom"
+
+
+def test_docker_desktop_workflow():
+    wf = yaml.safe_load(
+        (REPO / ".github" / "workflows" / "docker-desktop.yml").read_text(encoding="utf-8")
+    )
+    smoke = wf["jobs"]["smoke"]
+    script = "\n".join(s.get("run", "") for s in smoke["steps"])
+    assert "127.0.0.1:6080" in script
+    assert "ros2 topic list" in script and "/odom" in script and "/cmd_vel" in script
+    assert "healthy" in script
+    build = next(s for s in smoke["steps"] if s.get("name") == "Build desktop image")
+    assert build["with"]["target"] == "desktop"
+    platforms = {i["platform"] for i in wf["jobs"]["publish"]["strategy"]["matrix"]["include"]}
+    assert platforms == {"linux/amd64", "linux/arm64"}
+    assert wf["jobs"]["publish"]["if"] == "github.event_name == 'push'"

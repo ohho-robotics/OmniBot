@@ -2,12 +2,18 @@
 # Base: ROS 2 Jazzy on Ubuntu 24.04 (Noble)
 # Published to GHCR: ghcr.io/ohho-robotics/omnibot-sim
 #
+# Build targets:
+#   sim      (default, last stage)  headless sim image, unchanged behaviour
+#   desktop  browser desktop: TigerVNC + openbox + noVNC on port 6080, which
+#            starts Gazebo (GUI) and RViz. Published as
+#            ghcr.io/ohho-robotics/omnibot-desktop. See docker/README.md.
+#
 # The image default is CPU software rendering (llvmpipe). CI and
 # docker-compose.yml rely on that. docker-compose.gpu.yml overrides it at
 # runtime for Ogre2 EGL on an NVIDIA GPU. Do not flip LIBGL_ALWAYS_SOFTWARE
 # here.
 
-FROM ros:jazzy-ros-base-noble
+FROM ros:jazzy-ros-base-noble AS base
 
 ENV DEBIAN_FRONTEND=noninteractive \
     ROS_DISTRO=jazzy \
@@ -155,3 +161,85 @@ WORKDIR /workspaces/OmniBot
 
 ENTRYPOINT ["/omnibot_entrypoint.sh"]
 CMD ["/bin/bash"]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Browser desktop (docker build --target desktop)
+#
+# A virtual X display (TigerVNC's Xtigervnc), the openbox window manager and
+# noVNC served by websockify on port 6080. On start the container opens the
+# Gazebo Harmonic client and RViz on that display (software OpenGL, llvmpipe).
+# The VNC server listens on the container's loopback only; the browser reaches
+# it through websockify.
+# ══════════════════════════════════════════════════════════════════════════════
+FROM base AS desktop
+
+ARG USER_UID=1000
+ARG USER_GID=1000
+ARG NOVNC_VERSION=1.7.0
+ARG NOVNC_SHA256=b1003a11b6e6e8d8f7f5e5586daae7f8ca651d8aee0aa155ff9ac841c48f52c6
+
+USER root
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        tigervnc-standalone-server \
+        tigervnc-tools \
+        websockify \
+        openbox \
+        xterm \
+        x11-utils \
+        x11-xserver-utils \
+        dbus-x11 \
+        fonts-dejavu-core \
+        procps \
+        tini \
+        ca-certificates \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# noVNC from the release tag (pinned by checksum): the Ubuntu package is older
+# than the defaults.json used to auto-connect.
+RUN curl -fsSL -o /tmp/novnc.tgz \
+        "https://github.com/novnc/noVNC/archive/refs/tags/v${NOVNC_VERSION}.tar.gz" \
+    && echo "${NOVNC_SHA256}  /tmp/novnc.tgz" | sha256sum -c - \
+    && mkdir -p /opt/novnc \
+    && tar -xzf /tmp/novnc.tgz -C /opt/novnc --strip-components=1 \
+    && rm /tmp/novnc.tgz \
+    && cd /opt/novnc \
+    && sed -i 's|window.addEventListener("beforeunload", UI.handleBeforeUnload);|/* no leave-page prompt: the session keeps running */|' app/ui.js \
+    && sed -i 's|^const PAGE_TITLE = "noVNC";|const PAGE_TITLE = "OmniBot Sim";|' app/ui.js \
+    && sed -i 's|<title>noVNC</title>|<title>OmniBot Sim</title>|' vnc.html \
+    && rm -rf docs tests snap utils po .github karma.conf.cjs eslint.config.mjs vnc_lite.html \
+    && printf '{"version": "%s"}\n' "${NOVNC_VERSION}" > package.json
+
+COPY docker/desktop/rootfs/ /
+RUN chmod 0755 /usr/local/bin/omnibot-desktop \
+        /usr/local/bin/omnibot-desktop-sim \
+        /usr/local/bin/omnibot-desktop-healthcheck \
+    && install -d -o ${USER_UID} -g ${USER_GID} /home/user/shared /tmp/.X11-unix \
+    && chmod 1777 /tmp/.X11-unix
+
+ENV DISPLAY=:1 \
+    QT_QPA_PLATFORM=xcb \
+    NOVNC_PORT=6080 \
+    OMNIBOT_WORLD=flat \
+    OMNIBOT_GUI=true \
+    OMNIBOT_RVIZ=true \
+    OMNIBOT_AUTOSTART=true \
+    OMNIBOT_RESOLUTION=1600x900
+
+USER user
+WORKDIR /home/user
+EXPOSE 6080
+
+HEALTHCHECK --interval=15s --timeout=6s --start-period=60s --retries=4 \
+    CMD ["/usr/local/bin/omnibot-desktop-healthcheck"]
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/omnibot-desktop"]
+CMD []
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Default target: the headless sim image (same as before the desktop stage was
+# added). Kept last so `docker build -f Dockerfile.sim .` still builds it.
+# ══════════════════════════════════════════════════════════════════════════════
+FROM base AS sim
