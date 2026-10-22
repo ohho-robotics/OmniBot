@@ -74,6 +74,18 @@ This brings up:
 3. Import the checked-in layout: [`omnibot-digital-twin/configs/foxglove/omnibot_layout.json`](omnibot-digital-twin/configs/foxglove/omnibot_layout.json).
 4. Watch the robot autonomously plan and drive to its destination in real time.
 
+### Browser desktop: Gazebo GUI and RViz at http://localhost:6080
+
+The `desktop` service runs the sim with its windows (Gazebo Harmonic client and RViz) on a virtual desktop streamed to the browser with noVNC. The host needs only Docker.
+
+<!-- docs-test: skip ros -->
+```bash
+docker compose up -d desktop          # then open http://localhost:6080
+docker compose stop desktop
+```
+
+Launchers that wait for the page and open the browser: `./docker/omnibot-desktop.sh` (Linux, macOS), `.\docker\omnibot-desktop.ps1` or `docker\omnibot-desktop.cmd` (Windows). The page is bound to 127.0.0.1; set `OMNIBOT_PORT` for another port, `OMNIBOT_WORLD=apartment` for the apartment, `OMNIBOT_VNC_PASSWORD` for a password. Details: [`docker/README.md`](docker/README.md).
+
 ### VS Code DevContainer
 
 Open this repository in VS Code with the Dev Containers extension installed and select **Reopen in Container** ([`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json)).

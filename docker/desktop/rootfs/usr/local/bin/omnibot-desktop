@@ -42,6 +42,7 @@ export OMNIBOT_LOG_DIR="${OMNIBOT_LOG_DIR:-/tmp/omnibot-desktop}"
 mkdir -p "${OMNIBOT_LOG_DIR}" "${HOME}/shared"
 
 pids=()
+# shellcheck disable=SC2329  # invoked by the trap below
 shutdown() {
     log "stopping"
     pkill -INT -f "sim_desktop.launch.py" 2>/dev/null || true

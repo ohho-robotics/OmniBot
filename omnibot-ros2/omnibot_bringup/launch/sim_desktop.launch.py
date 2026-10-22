@@ -18,12 +18,21 @@ gui:=true by default, and adds:
     the RViz robot model is complete.
   * rviz2 with config/sim_desktop.rviz (fixed frame odom: robot model, TF,
     /odom, /scan and the front camera), on sim time.
+  * GZ_SIM_RESOURCE_PATH += the share/ folder of omnibot_description, so
+    Gazebo resolves model://omnibot_description/... meshes (AprilTag plates)
+    in its window.
 """
 
 import os
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from ament_index_python.packages import get_package_share_directory
+from launch.actions import (
+    AppendEnvironmentVariable,
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    TimerAction,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -33,6 +42,12 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     bringup = FindPackageShare("omnibot_bringup")
+
+    # model://omnibot_description/<path> resolves against <prefix>/share.
+    model_path = AppendEnvironmentVariable(
+        "GZ_SIM_RESOURCE_PATH",
+        os.path.dirname(get_package_share_directory("omnibot_description")),
+    )
 
     sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -125,6 +140,7 @@ def generate_launch_description():
                 default_value="true",
                 description="Start rosbridge_websocket on 127.0.0.1:9090",
             ),
+            model_path,
             sim,
             joint_states,
             rviz,
